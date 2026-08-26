@@ -1,8 +1,314 @@
-/*
+/* Generic fallback for user-defined container types. */
+.dns-custom-container {
+	--dns-container-color: var(--interactive-accent);
+	margin: 1em 0;
+	padding: .85em 1em;
+	border: 1px solid color-mix(in srgb, var(--dns-container-color) 45%, transparent);
+	border-inline-start: 4px solid var(--dns-container-color);
+	border-radius: var(--radius-m);
+	background: color-mix(in srgb, var(--dns-container-color) 8%, var(--background-primary));
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.dns-custom-container__title {
+	margin-block-end: .45em;
+	color: var(--dns-container-color);
+	font-weight: var(--font-semibold);
+}
 
-If your plugin does not need CSS, delete this file.
+.dns-custom-container__content > :first-child { margin-block-start: 0; }
+.dns-custom-container__content > :last-child { margin-block-end: 0; }
 
-*/
+/* Writing style-guide blocks share an unboxed, editorial treatment. */
+.dns-custom-container:is(
+	[data-type='lead'],
+	[data-type='epigraph'],
+	[data-type='poem'],
+	[data-type='aside'],
+	[data-type='imgcap'],
+	[data-type='compnote']
+) {
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+}
+
+.dns-custom-container:is(
+	[data-type='lead'],
+	[data-type='epigraph'],
+	[data-type='poem'],
+	[data-type='aside']
+) .dns-custom-container__content {
+	white-space: pre-wrap;
+}
+
+.dns-custom-container[data-type='lead'] {
+	margin: 0 0 clamp(2rem, 5vh, 3rem);
+	color: #666662;
+	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
+	font-size: .94em;
+	line-height: 1.75;
+	text-align: left;
+}
+
+.dns-custom-container[data-type='epigraph'] {
+	position: relative;
+	max-width: 30rem;
+	margin: clamp(2.5rem, 7vh, 4.5rem) auto clamp(3rem, 8vh, 5rem);
+	padding-top: 1.25rem;
+	color: #747470;
+	font-family: inherit;
+	font-size: .9em;
+	line-height: 1.75;
+	text-align: right;
+}
+
+.dns-custom-container[data-type='epigraph']::before {
+	position: absolute;
+	top: 0;
+	left: 50%;
+	width: 2.5rem;
+	height: 1px;
+	background: #c9c8c2;
+	content: '';
+	transform: translateX(-50%);
+}
+
+.dns-custom-container[data-type='poem'] {
+	margin: clamp(1.25rem, 3vh, 1.75rem) 0;
+	padding-left: clamp(1rem, 3vw, 2rem);
+	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
+	font-size: .96em;
+	font-weight: 400;
+	letter-spacing: .012em;
+	line-height: 1.6;
+	text-align: left;
+}
+
+.dns-custom-container[data-type='poem'].dns-custom-container--cjk {
+	letter-spacing: .008em;
+	line-height: 1.92;
+}
+
+/* Multi-stanza poems stay in Obsidian's own DOM and are styled in place. */
+.dns-poem-delimiter { display: none; }
+
+.markdown-rendered .dns-poem-segment {
+	margin-block: 0 !important;
+	padding-left: clamp(1rem, 3vw, 2rem);
+	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
+	font-size: .96em;
+	font-weight: 400;
+	letter-spacing: .012em;
+	line-height: 1.6;
+	text-align: left;
+}
+
+.markdown-rendered .dns-poem-segment--first {
+	padding-top: clamp(1.25rem, 3vh, 1.75rem);
+}
+
+.markdown-rendered .dns-poem-segment--last {
+	padding-bottom: clamp(1.25rem, 3vh, 1.75rem);
+}
+
+.markdown-rendered .dns-poem-segment + .dns-poem-segment {
+	padding-top: .8em;
+}
+
+.markdown-rendered .dns-poem-segment > p {
+	margin-block: 0;
+}
+
+.markdown-rendered .dns-poem-segment--cjk {
+	letter-spacing: .008em;
+	line-height: 1.92;
+}
+
+.dns-custom-container[data-type='aside'] {
+	max-width: 40rem;
+	margin: clamp(2rem, 5vh, 3.25rem) auto;
+	padding: .25rem 0 .25rem clamp(1.1rem, 3vw, 1.6rem);
+	border-left: 1px solid #c5c4be;
+	color: #747470;
+	font-family: inherit;
+	font-size: .9em;
+	line-height: 1.75;
+	text-align: left;
+}
+
+.dns-custom-container[data-type='imgcap'] {
+	max-width: 36rem;
+	margin: -1.75rem auto clamp(2rem, 5vh, 3rem);
+	color: #8a8a86;
+	font-size: .72rem;
+	line-height: 1.15;
+	text-align: center;
+}
+
+.markdown-rendered :is(p, div):has(+ .dns-custom-container[data-type='imgcap']) {
+	margin-bottom: 0 !important;
+}
+
+.dns-custom-container[data-type='imgcap'] .dns-custom-container__content > p {
+	margin-block: 0;
+}
+
+.dns-custom-container[data-type='imgcap'] .dns-custom-container__content,
+.dns-custom-container[data-type='compnote'] .dns-custom-container__content {
+	white-space: pre-line;
+}
+
+.dns-custom-container[data-type='compnote'] {
+	margin: clamp(4rem, 10vh, 7rem) 0 0;
+	color: #a3a3a0;
+	font-size: .68rem;
+	letter-spacing: .012em;
+	line-height: 1.45;
+	text-align: right;
+}
+
+.dns-custom-container[data-type='compnote'].dns-custom-container--cjk {
+	letter-spacing: .02em;
+}
+
+.markdown-rendered hr:has(+ .dns-custom-container[data-type='compnote']) {
+	display: none;
+}
+
+/* Keep the same hierarchy legible against Obsidian's dark background. */
+.theme-dark .dns-custom-container[data-type='lead'] { color: #b9b9b4; }
+.theme-dark .dns-custom-container:is([data-type='epigraph'], [data-type='aside']) { color: #aaa9a4; }
+.theme-dark .dns-custom-container[data-type='epigraph']::before { background: #595955; }
+.theme-dark .dns-custom-container[data-type='aside'] { border-color: #595955; }
+
+/* Settings project navigation. */
+.dns-settings-navigation {
+	display: flex;
+	gap: .15rem;
+	margin: .25rem 0 1.75rem;
+	padding: 0 .45rem;
+	overflow-x: auto;
+	border: 0;
+	border-bottom: 2px solid var(--background-modifier-border);
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.dns-settings-navigation__item {
+	position: relative;
+	flex: 0 0 auto;
+	min-height: 2.35rem;
+	margin-bottom: -2px;
+	padding: .55rem .85rem .65rem;
+	border: 1px solid transparent;
+	border-bottom: 0;
+	border-radius: var(--radius-s) var(--radius-s) 0 0;
+	background: transparent !important;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	font-weight: 500;
+	letter-spacing: .005em;
+	cursor: pointer;
+	box-shadow: none !important;
+	transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.dns-settings-navigation__item:not(.is-active) {
+	border-color: transparent !important;
+	background: transparent !important;
+	box-shadow: none !important;
+}
+
+.dns-settings-navigation__item:not(.is-active):hover {
+	background: var(--background-modifier-hover) !important;
+	color: var(--text-normal);
+}
+
+.dns-settings-navigation__item.is-active {
+	background: var(--background-primary-alt) !important;
+	color: var(--text-normal);
+	font-weight: 600;
+	border-color: var(--background-modifier-border-hover) !important;
+	transform: translateY(-2px);
+	box-shadow: 0 -4px 10px rgb(0 0 0 / .14), inset 0 1px 0 rgb(255 255 255 / .04) !important;
+}
+
+.dns-settings-navigation__item.is-active::after {
+	display: none;
+}
+
+@media (max-width: 520px) {
+	.dns-settings-navigation {
+		width: 100%;
+	}
+}
+
+/* Reading-view typography controls. */
+.dns-page-typography .markdown-rendered {
+	--font-text-size: var(--dns-font-size);
+	font-size: var(--dns-font-size);
+	letter-spacing: var(--dns-letter-spacing);
+	word-spacing: var(--dns-word-spacing);
+	line-height: var(--dns-line-height);
+}
+
+.dns-page-typography .markdown-rendered .el-p:not(.dns-poem-segment) > p {
+	margin-block-end: var(--dns-paragraph-spacing);
+}
+
+.dns-editor-typography .markdown-source-view.mod-cm6 .cm-content {
+	--font-text-size: var(--dns-editing-font-size);
+	font-size: var(--dns-editing-font-size);
+	letter-spacing: var(--dns-editing-letter-spacing);
+	word-spacing: var(--dns-editing-word-spacing);
+}
+
+.dns-editor-typography .markdown-source-view.mod-cm6 .cm-line {
+	line-height: var(--dns-editing-line-height);
+}
+
+.dns-editor-typography .markdown-source-view.mod-cm6 .cm-line.HyperMD-paragraph {
+	padding-bottom: var(--dns-editing-paragraph-spacing);
+}
+
+.dns-settings-navigation--secondary {
+	margin-top: -.35rem;
+	margin-bottom: 1rem;
+	font-size: var(--font-ui-smaller);
+}
+
+.dns-colon-block-list {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: .55rem;
+	margin-top: .75rem;
+}
+
+.dns-colon-block-list__item {
+	display: flex;
+	align-items: baseline;
+	gap: .7rem;
+	min-width: 0;
+	padding: .7rem .8rem;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+}
+
+.dns-colon-block-list__item code {
+	flex: 0 0 auto;
+	color: var(--text-accent);
+	font-size: var(--font-ui-small);
+}
+
+.dns-colon-block-list__item span {
+	min-width: 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+@media (max-width: 620px) {
+	.dns-colon-block-list { grid-template-columns: 1fr; }
+}

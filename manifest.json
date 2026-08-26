@@ -1,11 +1,9 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
-	"version": "1.0.0",
-	"minAppVersion": "1.0.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"id": "dns-toolkit",
+	"name": "DnS Toolkit",
+	"version": "0.1.0",
+	"minAppVersion": "1.5.0",
+	"description": "Render extensible custom Markdown containers delimited by :::.",
+	"author": "DnS",
 	"isDesktopOnly": false
 }

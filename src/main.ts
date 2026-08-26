@@ -1,114 +1,161 @@
+import { Plugin } from 'obsidian';
+import { registerCommands } from './commands';
 import {
-	Editor,
-	MarkdownView,
-	MarkdownFileInfo,
-	Modal,
-	Notice,
-	Plugin,
-} from 'obsidian';
+	renderCustomContainers,
+	restoreCustomContainers,
+} from './render/custom-container';
 import {
 	DEFAULT_SETTINGS,
-	MyPluginSettings,
-	SampleSettingTab,
+	DnsToolkitSettingTab,
+	type DnsToolkitSettings,
 } from './settings';
 
-// Remember to rename these classes and interfaces!
+export default class DnsToolkitPlugin extends Plugin {
+	settings!: DnsToolkitSettings;
+	private poemObserver: MutationObserver | null = null;
 
-export default class MyPlugin extends Plugin {
-	settings!: MyPluginSettings;
-
-	async onload() {
+	async onload(): Promise<void> {
 		await this.loadSettings();
+		this.applyTypographySettings();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (_evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		this.registerMarkdownPostProcessor((element) => {
+			if (!this.settings.enableCustomContainers) return;
+			renderCustomContainers(element, this.settings.defaultType);
 		});
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			},
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (
-				editor: Editor,
-				_ctx: MarkdownView | MarkdownFileInfo,
-			) => {
-				editor.replaceSelection('Sample editor command');
-			},
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView =
-					this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			},
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(activeDocument, 'click', (_evt: MouseEvent) => {
-			new Notice('Click');
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(
-			window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000),
-		);
+		registerCommands(this);
+		this.addSettingTab(new DnsToolkitSettingTab(this.app, this));
+		this.observePoems();
+		this.renderMountedPoems();
 	}
 
-	onunload() {}
+	onunload(): void {
+		this.poemObserver?.disconnect();
+		this.poemObserver = null;
+		this.clearTypographySettings();
+	}
 
-	async loadSettings() {
+	private clearTypographySettings(): void {
+		const workspace = this.app.workspace.containerEl;
+		workspace.removeClasses(['dns-page-typography', 'dns-editor-typography']);
+		for (const property of [
+			'--dns-font-size',
+			'--dns-letter-spacing',
+			'--dns-word-spacing',
+			'--dns-line-height',
+			'--dns-paragraph-spacing',
+			'--dns-editing-font-size',
+			'--dns-editing-letter-spacing',
+			'--dns-editing-word-spacing',
+			'--dns-editing-line-height',
+			'--dns-editing-paragraph-spacing',
+		]) {
+			workspace.style.removeProperty(property);
+		}
+	}
+
+	private observePoems(): void {
+		this.poemObserver = new MutationObserver((mutations) => {
+			if (!this.settings.enableCustomContainers) return;
+			const previews = new Set<HTMLElement>();
+			for (const mutation of mutations) {
+				const mutationElement = mutation.target.instanceOf(HTMLElement)
+					? mutation.target
+					: mutation.target.parentElement;
+				const mutationPreview = mutationElement?.closest<HTMLElement>(
+					'.markdown-preview-sizer',
+				);
+				if (mutationPreview?.textContent?.includes(':::poem')) {
+					previews.add(mutationPreview);
+				}
+				if (mutation.type === 'characterData') {
+					const preview = mutation.target.parentElement?.closest<HTMLElement>(
+						'.markdown-preview-sizer',
+					);
+					if (preview?.textContent?.includes(':::poem')) previews.add(preview);
+				}
+				for (const node of Array.from(mutation.addedNodes)) {
+					if (!node.instanceOf(HTMLElement)) continue;
+					const preview = node.closest<HTMLElement>('.markdown-preview-sizer');
+					if (preview?.textContent?.includes(':::poem')) previews.add(preview);
+				}
+			}
+
+			for (const preview of previews) {
+				renderCustomContainers(preview, this.settings.defaultType);
+			}
+		});
+		this.poemObserver.observe(this.app.workspace.containerEl, {
+			childList: true,
+			characterData: true,
+			subtree: true,
+		});
+	}
+
+	private renderMountedPoems(): void {
+		if (!this.settings.enableCustomContainers) return;
+		for (const preview of Array.from(
+			this.app.workspace.containerEl.querySelectorAll<HTMLElement>(
+				'.markdown-preview-sizer',
+			),
+		)) {
+			if (preview.textContent?.includes(':::poem')) {
+				renderCustomContainers(preview, this.settings.defaultType);
+			}
+		}
+	}
+
+	refreshCustomContainers(): void {
+		for (const preview of Array.from(
+			this.app.workspace.containerEl.querySelectorAll<HTMLElement>(
+				'.markdown-preview-sizer',
+			),
+		)) {
+			if (this.settings.enableCustomContainers) {
+				for (const block of Array.from(
+					preview.querySelectorAll<HTMLElement>('.el-p'),
+				)) {
+					renderCustomContainers(block, this.settings.defaultType);
+				}
+				renderCustomContainers(preview, this.settings.defaultType);
+			} else {
+				restoreCustomContainers(preview);
+			}
+		}
+	}
+
+	applyTypographySettings(): void {
+		const workspace = this.app.workspace.containerEl;
+		workspace.toggleClass('dns-page-typography', this.settings.enableTypography);
+		workspace.toggleClass('dns-editor-typography', this.settings.enableEditingTypography);
+
+		const values: Record<string, string | null> = {
+			'--dns-font-size': this.settings.enableTypography ? `${this.settings.fontSize}px` : null,
+			'--dns-letter-spacing': this.settings.enableTypography ? `${this.settings.letterSpacing}em` : null,
+			'--dns-word-spacing': this.settings.enableTypography ? `${this.settings.wordSpacing}em` : null,
+			'--dns-line-height': this.settings.enableTypography ? String(this.settings.lineHeight) : null,
+			'--dns-paragraph-spacing': this.settings.enableTypography ? `${this.settings.paragraphSpacing}em` : null,
+			'--dns-editing-font-size': this.settings.enableEditingTypography ? `${this.settings.editingFontSize}px` : null,
+			'--dns-editing-letter-spacing': this.settings.enableEditingTypography ? `${this.settings.editingLetterSpacing}em` : null,
+			'--dns-editing-word-spacing': this.settings.enableEditingTypography ? `${this.settings.editingWordSpacing}em` : null,
+			'--dns-editing-line-height': this.settings.enableEditingTypography ? String(this.settings.editingLineHeight) : null,
+			'--dns-editing-paragraph-spacing': this.settings.enableEditingTypography ? `${this.settings.editingParagraphSpacing}em` : null,
+		};
+		for (const [property, value] of Object.entries(values)) {
+			if (value === null) workspace.style.removeProperty(property);
+			else workspace.style.setProperty(property, value);
+		}
+	}
+
+	async loadSettings(): Promise<void> {
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<MyPluginSettings>,
+			(await this.loadData()) as Partial<DnsToolkitSettings>,
 		);
 	}
 
-	async saveSettings() {
+	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
 	}
 }
