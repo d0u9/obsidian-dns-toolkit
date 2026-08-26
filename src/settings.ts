@@ -5,6 +5,7 @@ import {
 	type SettingDefinitionItem,
 	type SettingGroupItem,
 	type SliderComponent,
+	type TextComponent,
 } from 'obsidian';
 import type DnsToolkitPlugin from './main';
 
@@ -42,6 +43,15 @@ export const DEFAULT_SETTINGS: DnsToolkitSettings = {
 	editingParagraphSpacing: 1,
 };
 
+const SUPPORTED_BLOCKS = [
+	{ type: 'lead', description: 'Opening introduction' },
+	{ type: 'epigraph', description: 'Quotation or epigraph' },
+	{ type: 'poem', description: 'Verse with stanza spacing' },
+	{ type: 'aside', description: 'Supporting note or context' },
+	{ type: 'imgcap', description: 'Image caption' },
+	{ type: 'compnote', description: 'Closing composition note' },
+] as const;
+
 export class DnsToolkitSettingTab extends PluginSettingTab {
 	private activeSection: 'containers' | 'typography' = 'containers';
 	private activeTypographyView: 'reading' | 'editing' = 'reading';
@@ -76,6 +86,15 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 							placeholder: 'Note',
 							validate: (value) => value.trim() ? undefined : 'Enter a container type.',
 						},
+					},
+					{
+						type: 'page',
+						name: 'Supported blocks',
+						desc: 'Block types with dedicated editorial styles.',
+						items: SUPPORTED_BLOCKS.map((block) => ({
+							name: `:::${block.type}`,
+							desc: block.description,
+						})),
 					},
 				],
 			},
@@ -127,12 +146,12 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 			default:
 				return;
 		}
-		await this.plugin.saveSettings();
 		if (key === 'enableCustomContainers') {
 			this.plugin.refreshCustomContainers();
 		} else if (key !== 'defaultType') {
 			this.plugin.applyTypographySettings();
 		}
+		await this.plugin.saveSettings();
 	}
 
 	private getTypographyDefinitions(
@@ -164,15 +183,13 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 			] as const).map(([name, desc, readingKey, editingKey, min, max, step]) => ({
 				name,
 				desc,
-				control: {
-					type: 'slider' as const,
-					key: key(readingKey, editingKey),
-					defaultValue: DEFAULT_SETTINGS[key(readingKey, editingKey)] as number,
+				render: (setting: Setting) => this.addTypographyControls(
+					setting,
+					key(readingKey, editingKey) as TypographyNumberKey,
 					min,
 					max,
 					step,
-					displayFormat: (value: number) => `${value}`,
-				},
+				),
 			})),
 		];
 	}
@@ -255,14 +272,7 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 			.setHeading();
 
 		const blockList = this.containerEl.createDiv({ cls: 'dns-colon-block-list' });
-		for (const block of [
-			{ type: 'lead', description: 'Opening introduction' },
-			{ type: 'epigraph', description: 'Quotation or epigraph' },
-			{ type: 'poem', description: 'Verse with stanza spacing' },
-			{ type: 'aside', description: 'Supporting note or context' },
-			{ type: 'imgcap', description: 'Image caption' },
-			{ type: 'compnote', description: 'Closing composition note' },
-		]) {
+		for (const block of SUPPORTED_BLOCKS) {
 			const item = blockList.createDiv({ cls: 'dns-colon-block-list__item' });
 			item.createEl('code', { text: `:::${block.type}` });
 			item.createSpan({ text: block.description });
@@ -351,17 +361,57 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 		maximum: number,
 		step: number,
 	): void {
-		let sliderComponent: SliderComponent | null = null;
 		const setting = new Setting(this.containerEl)
 			.setName(name)
 			.setDesc(description);
+		this.addTypographyControls(setting, key, minimum, maximum, step);
+	}
+
+	private addTypographyControls(
+		setting: Setting,
+		key: TypographyNumberKey,
+		minimum: number,
+		maximum: number,
+		step: number,
+	): () => void {
+		let sliderComponent: SliderComponent | null = null;
+		let numberComponent: TextComponent | null = null;
+		let removeSliderListener = (): void => {};
+		const applyValue = (value: number): void => {
+			if (!Number.isFinite(value) || value < minimum || value > maximum) return;
+			this.plugin.settings[key] = value;
+			this.plugin.applyTypographySettings();
+		};
+		setting.addText((text) => {
+			numberComponent = text;
+			text.inputEl.type = 'number';
+			text.inputEl.min = String(minimum);
+			text.inputEl.max = String(maximum);
+			text.inputEl.step = String(step);
+			text.inputEl.addClass('dns-typography-number');
+			text.setValue(String(this.plugin.settings[key])).onChange(async (rawValue) => {
+				const value = Number(rawValue);
+				applyValue(value);
+				sliderComponent?.setValue(value);
+				await this.plugin.saveSettings();
+			});
+		});
+		const onSliderInput = (event: Event): void => {
+			if (!(event.currentTarget instanceof HTMLInputElement)) return;
+			const value = Number(event.currentTarget.value);
+			applyValue(value);
+			numberComponent?.setValue(String(value));
+		};
 		setting.addSlider((slider) => {
 			sliderComponent = slider;
+			slider.sliderEl.addEventListener('input', onSliderInput);
+			removeSliderListener = () => slider.sliderEl.removeEventListener('input', onSliderInput);
 			slider
 					.setLimits(minimum, maximum, step)
 					.setValue(this.plugin.settings[key])
 					.onChange(async (value) => {
 						this.plugin.settings[key] = value;
+						numberComponent?.setValue(String(value));
 						this.plugin.applyTypographySettings();
 						await this.plugin.saveSettings();
 					});
@@ -369,14 +419,21 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 		setting.addExtraButton((button) =>
 			button
 				.setIcon('rotate-ccw')
-				.setTooltip(`Reset ${name.toLowerCase()}`)
+				.setTooltip(`Reset ${setting.nameEl.textContent?.toLowerCase() ?? 'value'}`)
 				.onClick(async () => {
 					const defaultValue = DEFAULT_SETTINGS[key];
 					this.plugin.settings[key] = defaultValue;
+					numberComponent?.setValue(String(defaultValue));
 					sliderComponent?.setValue(defaultValue);
 					this.plugin.applyTypographySettings();
 					await this.plugin.saveSettings();
 				}),
 		);
+		return () => {
+			removeSliderListener();
+		};
 	}
 }
+
+type TypographyNumberKey = Exclude<keyof DnsToolkitSettings,
+	'enableCustomContainers' | 'defaultType' | 'enableTypography' | 'enableEditingTypography'>;
