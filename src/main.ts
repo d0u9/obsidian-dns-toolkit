@@ -1,4 +1,4 @@
-import { Plugin } from 'obsidian';
+import { MarkdownView, Notice, Plugin } from 'obsidian';
 import { registerCommands } from './commands';
 import {
 	renderCustomContainers,
@@ -13,13 +13,14 @@ import {
 export default class DnsToolkitPlugin extends Plugin {
 	settings!: DnsToolkitSettings;
 	private poemObserver: MutationObserver | null = null;
+	private readonly disabledReadingViews = new WeakSet<HTMLElement>();
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
 		this.applyTypographySettings();
 
 		this.registerMarkdownPostProcessor((element) => {
-			if (!this.settings.enableCustomContainers) return;
+			if (!this.shouldRenderCustomContainers(element)) return;
 			renderCustomContainers(element, this.settings.defaultType);
 		});
 
@@ -82,6 +83,7 @@ export default class DnsToolkitPlugin extends Plugin {
 			}
 
 			for (const preview of previews) {
+				if (!this.shouldRenderCustomContainers(preview)) continue;
 				renderCustomContainers(preview, this.settings.defaultType);
 			}
 		});
@@ -92,6 +94,46 @@ export default class DnsToolkitPlugin extends Plugin {
 		});
 	}
 
+	private shouldRenderCustomContainers(element: HTMLElement): boolean {
+		if (!this.settings.enableCustomContainers) return false;
+		const readingView = element.closest<HTMLElement>('.markdown-preview-view');
+		return readingView === null || !this.disabledReadingViews.has(readingView);
+	}
+
+	private renderPreviewContainers(preview: HTMLElement): void {
+		for (const block of Array.from(
+			preview.querySelectorAll<HTMLElement>('.el-p'),
+		)) {
+			renderCustomContainers(block, this.settings.defaultType);
+		}
+		renderCustomContainers(preview, this.settings.defaultType);
+	}
+
+	toggleColonBlocksInActiveReadingView(): void {
+		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (view === null || view.getMode() !== 'preview') {
+			new Notice('Open a Markdown note in reading view first.');
+			return;
+		}
+		if (!this.settings.enableCustomContainers) {
+			new Notice('Enable colon blocks in the plugin settings first.');
+			return;
+		}
+
+		const readingView = view.previewMode.containerEl;
+		const preview = readingView.querySelector<HTMLElement>('.markdown-preview-sizer');
+		if (this.disabledReadingViews.has(readingView)) {
+			this.disabledReadingViews.delete(readingView);
+			if (preview !== null) this.renderPreviewContainers(preview);
+			new Notice('Colon blocks enabled in this reading view.');
+			return;
+		}
+
+		this.disabledReadingViews.add(readingView);
+		if (preview !== null) restoreCustomContainers(preview);
+		new Notice('Colon blocks disabled in this reading view.');
+	}
+
 	private renderMountedPoems(): void {
 		if (!this.settings.enableCustomContainers) return;
 		for (const preview of Array.from(
@@ -99,7 +141,10 @@ export default class DnsToolkitPlugin extends Plugin {
 				'.markdown-preview-sizer',
 			),
 		)) {
-			if (preview.textContent?.includes(':::poem')) {
+			if (
+				this.shouldRenderCustomContainers(preview) &&
+				preview.textContent?.includes(':::poem')
+			) {
 				renderCustomContainers(preview, this.settings.defaultType);
 			}
 		}
@@ -111,13 +156,12 @@ export default class DnsToolkitPlugin extends Plugin {
 				'.markdown-preview-sizer',
 			),
 		)) {
-			if (this.settings.enableCustomContainers) {
-				for (const block of Array.from(
-					preview.querySelectorAll<HTMLElement>('.el-p'),
-				)) {
-					renderCustomContainers(block, this.settings.defaultType);
-				}
-				renderCustomContainers(preview, this.settings.defaultType);
+			const readingView = preview.closest<HTMLElement>('.markdown-preview-view');
+			if (
+				this.settings.enableCustomContainers &&
+				(readingView === null || !this.disabledReadingViews.has(readingView))
+			) {
+				this.renderPreviewContainers(preview);
 			} else {
 				restoreCustomContainers(preview);
 			}

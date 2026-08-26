@@ -11,4 +11,10 @@ export function registerCommands(plugin: DnsToolkitPlugin): void {
 			);
 		},
 	});
+
+	plugin.addCommand({
+		id: 'toggle-colon-blocks-current-reading-view',
+		name: 'Toggle colon blocks in current reading view',
+		callback: () => plugin.toggleColonBlocksInActiveReadingView(),
+	});
 }
