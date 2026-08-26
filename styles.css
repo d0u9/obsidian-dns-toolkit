@@ -171,12 +171,12 @@
 }
 
 .dns-custom-container[data-type='imgcap'] {
-	max-width: 36rem;
-	margin: -1.75rem auto clamp(2rem, 5vh, 3rem);
+	max-width: none;
+	margin: -.75rem 0 clamp(2rem, 5vh, 3rem);
 	color: #8a8a86;
-	font-size: .72rem;
-	line-height: 1.15;
-	text-align: center;
+	font-size: .68rem;
+	line-height: 1.55;
+	text-align: left;
 }
 
 .markdown-rendered .dns-before-imgcap.dns-before-imgcap {
