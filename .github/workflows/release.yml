@@ -3,7 +3,7 @@ name: Release Obsidian plugin
 on:
     push:
         tags:
-            - '*'
+            - '[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
     build:
@@ -24,7 +24,13 @@ jobs:
             - name: Build plugin
               run: |
                   npm ci
+                  npm run lint
                   npm run build
+
+            - name: Verify release version
+              env:
+                  RELEASE_TAG: ${{ github.ref_name }}
+              run: node -e "const manifest = require('./manifest.json'); if (manifest.version !== process.env.RELEASE_TAG) { throw new Error('Tag ' + process.env.RELEASE_TAG + ' does not match manifest version ' + manifest.version); }"
 
             - name: Check for optional styles
               id: styles
@@ -36,6 +42,7 @@ jobs:
               with:
                   subject-path: |
                       main.js
+                      manifest.json
                       ${{ steps.styles.outputs.exists == 'true' && 'styles.css' || '' }}
 
             - name: Create release
