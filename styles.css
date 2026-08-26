@@ -93,8 +93,8 @@
 /* Multi-stanza poems stay in Obsidian's own DOM and are styled in place. */
 .dns-poem-delimiter { display: none; }
 
-.markdown-rendered .dns-poem-segment {
-	margin-block: 0 !important;
+.markdown-rendered .dns-poem-segment.dns-poem-segment {
+	margin-block: 0;
 	padding-left: clamp(1rem, 3vw, 2rem);
 	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
 	font-size: .96em;
@@ -146,8 +146,8 @@
 	text-align: center;
 }
 
-.markdown-rendered :is(p, div):has(+ .dns-custom-container[data-type='imgcap']) {
-	margin-bottom: 0 !important;
+.markdown-rendered .dns-before-imgcap.dns-before-imgcap {
+	margin-bottom: 0;
 }
 
 .dns-custom-container[data-type='imgcap'] .dns-custom-container__content > p {
@@ -172,7 +172,7 @@
 	letter-spacing: .02em;
 }
 
-.markdown-rendered hr:has(+ .dns-custom-container[data-type='compnote']) {
+.markdown-rendered hr.dns-before-compnote {
 	display: none;
 }
 
@@ -196,7 +196,7 @@
 	box-shadow: none;
 }
 
-.dns-settings-navigation__item {
+.dns-settings-navigation > button.dns-settings-navigation__item {
 	position: relative;
 	flex: 0 0 auto;
 	min-height: 2.35rem;
@@ -205,34 +205,34 @@
 	border: 1px solid transparent;
 	border-bottom: 0;
 	border-radius: var(--radius-s) var(--radius-s) 0 0;
-	background: transparent !important;
+	background: transparent;
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
 	font-weight: 500;
 	letter-spacing: .005em;
 	cursor: pointer;
-	box-shadow: none !important;
+	box-shadow: none;
 	transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 
-.dns-settings-navigation__item:not(.is-active) {
-	border-color: transparent !important;
-	background: transparent !important;
-	box-shadow: none !important;
+.dns-settings-navigation > button.dns-settings-navigation__item:not(.is-active) {
+	border-color: transparent;
+	background: transparent;
+	box-shadow: none;
 }
 
-.dns-settings-navigation__item:not(.is-active):hover {
-	background: var(--background-modifier-hover) !important;
+.dns-settings-navigation > button.dns-settings-navigation__item:not(.is-active):hover {
+	background: var(--background-modifier-hover);
 	color: var(--text-normal);
 }
 
-.dns-settings-navigation__item.is-active {
-	background: var(--background-primary-alt) !important;
+.dns-settings-navigation > button.dns-settings-navigation__item.is-active {
+	background: var(--background-primary-alt);
 	color: var(--text-normal);
 	font-weight: 600;
-	border-color: var(--background-modifier-border-hover) !important;
+	border-color: var(--background-modifier-border-hover);
 	transform: translateY(-2px);
-	box-shadow: 0 -4px 10px rgb(0 0 0 / .14), inset 0 1px 0 rgb(255 255 255 / .04) !important;
+	box-shadow: 0 -4px 10px rgb(0 0 0 / .14), inset 0 1px 0 rgb(255 255 255 / .04);
 }
 
 .dns-settings-navigation__item.is-active::after {

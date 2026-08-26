@@ -1,4 +1,11 @@
-import { App, PluginSettingTab, Setting, type SliderComponent } from 'obsidian';
+import {
+	App,
+	PluginSettingTab,
+	Setting,
+	type SettingDefinitionItem,
+	type SettingGroupItem,
+	type SliderComponent,
+} from 'obsidian';
 import type DnsToolkitPlugin from './main';
 
 export interface DnsToolkitSettings {
@@ -41,6 +48,133 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 
 	constructor(app: App, private readonly plugin: DnsToolkitPlugin) {
 		super(app, plugin);
+	}
+
+	getSettingDefinitions(): SettingDefinitionItem<keyof DnsToolkitSettings>[] {
+		return [
+			{
+				type: 'page',
+				name: 'Colon blocks',
+				desc: 'Parse and style Markdown blocks delimited by three colons.',
+				items: [
+					{
+						name: 'Enable',
+						desc: 'Render custom containers in reading view.',
+						control: {
+							type: 'toggle',
+							key: 'enableCustomContainers',
+							defaultValue: DEFAULT_SETTINGS.enableCustomContainers,
+						},
+					},
+					{
+						name: 'Default type',
+						desc: 'Used when an opening delimiter does not specify a type.',
+						control: {
+							type: 'text',
+							key: 'defaultType',
+							defaultValue: DEFAULT_SETTINGS.defaultType,
+							placeholder: 'Note',
+							validate: (value) => value.trim() ? undefined : 'Enter a container type.',
+						},
+					},
+				],
+			},
+			{
+				type: 'page',
+				name: 'Page typography',
+				desc: 'Adjust reading and editing views independently.',
+				items: [
+					{
+						type: 'group',
+						heading: 'Reading view',
+						items: this.getTypographyDefinitions('reading'),
+					},
+					{
+						type: 'group',
+						heading: 'Editing view',
+						items: this.getTypographyDefinitions('editing'),
+					},
+				],
+			},
+		];
+	}
+
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		switch (key) {
+			case 'enableCustomContainers':
+			case 'enableTypography':
+			case 'enableEditingTypography':
+				if (typeof value !== 'boolean') return;
+				this.plugin.settings[key] = value;
+				break;
+			case 'defaultType':
+				if (typeof value !== 'string' || !value.trim()) return;
+				this.plugin.settings.defaultType = value.trim();
+				break;
+			case 'fontSize':
+			case 'letterSpacing':
+			case 'wordSpacing':
+			case 'lineHeight':
+			case 'paragraphSpacing':
+			case 'editingFontSize':
+			case 'editingLetterSpacing':
+			case 'editingWordSpacing':
+			case 'editingLineHeight':
+			case 'editingParagraphSpacing':
+				if (typeof value !== 'number' || !Number.isFinite(value)) return;
+				this.plugin.settings[key] = value;
+				break;
+			default:
+				return;
+		}
+		await this.plugin.saveSettings();
+		if (key === 'enableCustomContainers') {
+			this.plugin.refreshCustomContainers();
+		} else if (key !== 'defaultType') {
+			this.plugin.applyTypographySettings();
+		}
+	}
+
+	private getTypographyDefinitions(
+		view: 'reading' | 'editing',
+	): SettingGroupItem<keyof DnsToolkitSettings>[] {
+		const editing = view === 'editing';
+		const key = <K extends keyof DnsToolkitSettings>(
+			readingKey: K,
+			editingKey: keyof DnsToolkitSettings,
+		): keyof DnsToolkitSettings => editing ? editingKey : readingKey;
+		return [
+			{
+				name: 'Enable',
+				desc: `Override typography in Markdown ${editing ? 'editing' : 'reading'} view.`,
+				control: {
+					type: 'toggle',
+					key: key('enableTypography', 'enableEditingTypography'),
+					defaultValue: editing
+						? DEFAULT_SETTINGS.enableEditingTypography
+						: DEFAULT_SETTINGS.enableTypography,
+				},
+			},
+			...([
+				['Font size', `Base ${view} size in pixels.`, 'fontSize', 'editingFontSize', 12, 24, 0.5],
+				['Letter spacing', 'Space between characters in em.', 'letterSpacing', 'editingLetterSpacing', -0.05, 0.15, 0.005],
+				['Word spacing', 'Additional space between words in em.', 'wordSpacing', 'editingWordSpacing', -0.1, 0.5, 0.01],
+				['Line height', 'Vertical rhythm within paragraphs.', 'lineHeight', 'editingLineHeight', 1.2, 2.4, 0.05],
+				['Paragraph spacing', 'Space after ordinary paragraphs in em.', 'paragraphSpacing', 'editingParagraphSpacing', editing ? 0 : 0.25, 2.5, 0.05],
+			] as const).map(([name, desc, readingKey, editingKey, min, max, step]) => ({
+				name,
+				desc,
+				control: {
+					type: 'slider' as const,
+					key: key(readingKey, editingKey),
+					defaultValue: DEFAULT_SETTINGS[key(readingKey, editingKey)] as number,
+					min,
+					max,
+					step,
+					displayFormat: (value: number) => `${value}`,
+				},
+			})),
+		];
 	}
 
 	display(): void {

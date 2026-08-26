@@ -1,9 +1,22 @@
 const DELIMITER = /^:::\s*(?:(\S+)(?:\s+(.+))?)?\s*$/;
 const TYPE_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
+const CJK_PATTERN = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
 
 interface OpeningDelimiter {
 	type: string;
 	title?: string;
+}
+
+const ADJACENCY_CLASSES = ['dns-before-imgcap', 'dns-before-compnote'] as const;
+
+function clearAdjacencyClasses(root: HTMLElement): void {
+	root.querySelectorAll(ADJACENCY_CLASSES.map((name) => `.${name}`).join(',')).forEach(
+		(element) => element.removeClasses([...ADJACENCY_CLASSES]),
+	);
+}
+
+function containsCjk(text: string): boolean {
+	return CJK_PATTERN.test(text);
 }
 
 function parseOpeningDelimiter(
@@ -120,8 +133,8 @@ function markCrossSectionPoems(root: HTMLElement): void {
 		if (!closer || closingIndex >= blocks.length) continue;
 
 		const poemBlocks = blocks.slice(index, closingIndex + 1);
-		const isCjk = /\p{Script=Han}/u.test(
-			poemBlocks.map((block) => block.textContent).join(''),
+		const isCjk = containsCjk(
+			poemBlocks.map((block) => block.textContent ?? '').join(''),
 		);
 		for (const block of poemBlocks) {
 			block.addClass('dns-poem-segment');
@@ -137,6 +150,7 @@ function markCrossSectionPoems(root: HTMLElement): void {
 
 /** Converts top-level rendered Markdown between ::: delimiters into containers. */
 export function renderCustomContainers(root: HTMLElement, defaultType: string): void {
+	clearAdjacencyClasses(root);
 	splitCompactDelimiterParagraphs(root);
 
 	const children = Array.from(root.children);
@@ -170,8 +184,14 @@ export function renderCustomContainers(root: HTMLElement, defaultType: string): 
 			const child = children[cursor];
 			if (child) content.append(child);
 		}
-		if (/\p{Script=Han}/u.test(content.textContent ?? '')) {
+		if (containsCjk(content.textContent ?? '')) {
 			container.classList.add('dns-custom-container--cjk');
+		}
+		const precedingBlock = opener.previousElementSibling;
+		if (opening.type === 'imgcap') {
+			precedingBlock?.addClass('dns-before-imgcap');
+		} else if (opening.type === 'compnote' && precedingBlock?.tagName === 'HR') {
+			precedingBlock.addClass('dns-before-compnote');
 		}
 		opener.replaceWith(container);
 		closer.remove();
@@ -183,6 +203,7 @@ export function renderCustomContainers(root: HTMLElement, defaultType: string): 
 }
 
 export function restoreCustomContainers(root: HTMLElement): void {
+	clearAdjacencyClasses(root);
 	for (const container of Array.from(
 		root.querySelectorAll<HTMLElement>('.dns-custom-container'),
 	)) {
