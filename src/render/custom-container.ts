@@ -141,7 +141,7 @@ function markCrossSectionPoems(root: HTMLElement): void {
 			if (isCjk) block.addClass('dns-poem-segment--cjk');
 		}
 		poemBlocks[0]?.addClass('dns-poem-segment--first');
-		poemBlocks.at(-1)?.addClass('dns-poem-segment--last');
+		poemBlocks[poemBlocks.length - 1]?.addClass('dns-poem-segment--last');
 		opener.addClass('dns-poem-delimiter');
 		closer.addClass('dns-poem-delimiter');
 		index = closingIndex;
