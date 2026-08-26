@@ -12,7 +12,7 @@ import {
 
 export default class DnsToolkitPlugin extends Plugin {
 	settings!: DnsToolkitSettings;
-	private poemObserver: MutationObserver | null = null;
+	private crossSectionContainerObserver: MutationObserver | null = null;
 	private readonly disabledReadingViews = new WeakSet<HTMLElement>();
 
 	async onload(): Promise<void> {
@@ -26,13 +26,13 @@ export default class DnsToolkitPlugin extends Plugin {
 
 		registerCommands(this);
 		this.addSettingTab(new DnsToolkitSettingTab(this.app, this));
-		this.observePoems();
-		this.renderMountedPoems();
+		this.observeCrossSectionContainers();
+		this.renderMountedCrossSectionContainers();
 	}
 
 	onunload(): void {
-		this.poemObserver?.disconnect();
-		this.poemObserver = null;
+		this.crossSectionContainerObserver?.disconnect();
+		this.crossSectionContainerObserver = null;
 		this.clearTypographySettings();
 	}
 
@@ -55,8 +55,14 @@ export default class DnsToolkitPlugin extends Plugin {
 		}
 	}
 
-	private observePoems(): void {
-		this.poemObserver = new MutationObserver((mutations) => {
+	private hasCrossSectionContainer(preview: HTMLElement): boolean {
+		return Array.from(preview.querySelectorAll('p')).some((paragraph) =>
+			/^:::\s*(?:poem|aside)(?:\s|$)/i.test(paragraph.textContent?.trim() ?? ''),
+		);
+	}
+
+	private observeCrossSectionContainers(): void {
+		this.crossSectionContainerObserver = new MutationObserver((mutations) => {
 			if (!this.settings.enableCustomContainers) return;
 			const previews = new Set<HTMLElement>();
 			for (const mutation of mutations) {
@@ -66,28 +72,35 @@ export default class DnsToolkitPlugin extends Plugin {
 				const mutationPreview = mutationElement?.closest<HTMLElement>(
 					'.markdown-preview-sizer',
 				);
-				if (mutationPreview?.textContent?.includes(':::poem')) {
+				if (
+					mutationPreview &&
+					this.hasCrossSectionContainer(mutationPreview)
+				) {
 					previews.add(mutationPreview);
 				}
 				if (mutation.type === 'characterData') {
 					const preview = mutation.target.parentElement?.closest<HTMLElement>(
 						'.markdown-preview-sizer',
 					);
-					if (preview?.textContent?.includes(':::poem')) previews.add(preview);
+					if (preview && this.hasCrossSectionContainer(preview)) {
+						previews.add(preview);
+					}
 				}
 				for (const node of Array.from(mutation.addedNodes)) {
 					if (!node.instanceOf(HTMLElement)) continue;
 					const preview = node.closest<HTMLElement>('.markdown-preview-sizer');
-					if (preview?.textContent?.includes(':::poem')) previews.add(preview);
+					if (preview && this.hasCrossSectionContainer(preview)) {
+						previews.add(preview);
+					}
 				}
 			}
 
 			for (const preview of previews) {
 				if (!this.shouldRenderCustomContainers(preview)) continue;
-				renderCustomContainers(preview, this.settings.defaultType);
+				this.renderPreviewContainers(preview);
 			}
 		});
-		this.poemObserver.observe(this.app.workspace.containerEl, {
+		this.crossSectionContainerObserver.observe(this.app.workspace.containerEl, {
 			childList: true,
 			characterData: true,
 			subtree: true,
@@ -101,6 +114,11 @@ export default class DnsToolkitPlugin extends Plugin {
 	}
 
 	private renderPreviewContainers(preview: HTMLElement): void {
+		for (const section of Array.from(
+			preview.querySelectorAll<HTMLElement>('.markdown-preview-section'),
+		)) {
+			renderCustomContainers(section, this.settings.defaultType);
+		}
 		for (const block of Array.from(
 			preview.querySelectorAll<HTMLElement>('.el-p'),
 		)) {
@@ -134,7 +152,7 @@ export default class DnsToolkitPlugin extends Plugin {
 		new Notice('Colon blocks disabled in this reading view.');
 	}
 
-	private renderMountedPoems(): void {
+	private renderMountedCrossSectionContainers(): void {
 		if (!this.settings.enableCustomContainers) return;
 		for (const preview of Array.from(
 			this.app.workspace.containerEl.querySelectorAll<HTMLElement>(
@@ -143,9 +161,9 @@ export default class DnsToolkitPlugin extends Plugin {
 		)) {
 			if (
 				this.shouldRenderCustomContainers(preview) &&
-				preview.textContent?.includes(':::poem')
+				this.hasCrossSectionContainer(preview)
 			) {
-				renderCustomContainers(preview, this.settings.defaultType);
+				this.renderPreviewContainers(preview);
 			}
 		}
 	}

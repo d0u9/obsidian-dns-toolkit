@@ -101,50 +101,57 @@ function splitCompactDelimiterParagraphs(root: HTMLElement): void {
 	}
 }
 
-function markCrossSectionPoems(root: HTMLElement): void {
+function markCrossSectionBlocks(root: HTMLElement): void {
 	splitCompactDelimiterParagraphs(root);
-	root.querySelectorAll('.dns-poem-segment').forEach((element) => {
+	root.querySelectorAll('.dns-poem-segment, .dns-aside-segment').forEach((element) => {
 		element.removeClasses([
 			'dns-poem-segment',
 			'dns-poem-segment--first',
 			'dns-poem-segment--last',
 			'dns-poem-segment--cjk',
+			'dns-aside-segment',
+			'dns-aside-segment--first',
+			'dns-aside-segment--last',
 		]);
 	});
-	root.querySelectorAll('.dns-poem-delimiter').forEach((element) => {
-		element.removeClass('dns-poem-delimiter');
+	root.querySelectorAll('.dns-poem-delimiter, .dns-aside-delimiter').forEach((element) => {
+		element.removeClasses(['dns-poem-delimiter', 'dns-aside-delimiter']);
 	});
 
 	const blocks = Array.from(root.children) as HTMLElement[];
-	for (let index = 0; index < blocks.length; index += 1) {
-		const opener = Array.from(blocks[index]?.querySelectorAll('p') ?? []).find(
-			(paragraph) => paragraph.textContent?.trim().toLowerCase() === ':::poem',
-		);
-		if (!opener) continue;
-
-		let closingIndex = index;
-		let closer: HTMLParagraphElement | undefined;
-		while (closingIndex < blocks.length && !closer) {
-			closer = Array.from(blocks[closingIndex]?.querySelectorAll('p') ?? []).find(
-				(paragraph) => paragraph.textContent?.trim() === ':::',
+	for (const type of ['poem', 'aside'] as const) {
+		for (let index = 0; index < blocks.length; index += 1) {
+			const opener = Array.from(blocks[index]?.querySelectorAll('p') ?? []).find(
+				(paragraph) => paragraph.textContent?.trim().toLowerCase() === `:::${type}`,
 			);
-			if (!closer) closingIndex += 1;
-		}
-		if (!closer || closingIndex >= blocks.length) continue;
+			if (!opener) continue;
 
-		const poemBlocks = blocks.slice(index, closingIndex + 1);
-		const isCjk = containsCjk(
-			poemBlocks.map((block) => block.textContent ?? '').join(''),
-		);
-		for (const block of poemBlocks) {
-			block.addClass('dns-poem-segment');
-			if (isCjk) block.addClass('dns-poem-segment--cjk');
+			let closingIndex = index;
+			let closer: HTMLParagraphElement | undefined;
+			while (closingIndex < blocks.length && !closer) {
+				closer = Array.from(blocks[closingIndex]?.querySelectorAll('p') ?? []).find(
+					(paragraph) => paragraph.textContent?.trim() === ':::',
+				);
+				if (!closer) closingIndex += 1;
+			}
+			if (!closer || closingIndex >= blocks.length) continue;
+
+			const blockSegments = blocks.slice(index, closingIndex + 1);
+			const segmentClass = `dns-${type}-segment`;
+			const delimiterClass = `dns-${type}-delimiter`;
+			const isCjk = containsCjk(
+				blockSegments.map((block) => block.textContent ?? '').join(''),
+			);
+			for (const block of blockSegments) {
+				block.addClass(segmentClass);
+				if (type === 'poem' && isCjk) block.addClass('dns-poem-segment--cjk');
+			}
+			blockSegments[0]?.addClass(`${segmentClass}--first`);
+			blockSegments[blockSegments.length - 1]?.addClass(`${segmentClass}--last`);
+			opener.addClass(delimiterClass);
+			closer.addClass(delimiterClass);
+			index = closingIndex;
 		}
-		poemBlocks[0]?.addClass('dns-poem-segment--first');
-		poemBlocks[poemBlocks.length - 1]?.addClass('dns-poem-segment--last');
-		opener.addClass('dns-poem-delimiter');
-		closer.addClass('dns-poem-delimiter');
-		index = closingIndex;
 	}
 }
 
@@ -159,7 +166,7 @@ export function renderCustomContainers(root: HTMLElement, defaultType: string): 
 		if (!opener) continue;
 		const opening = parseOpeningDelimiter(opener.textContent?.trim() ?? '', defaultType);
 		if (!opening) continue;
-		if (opening.type === 'poem') continue;
+		if (opening.type === 'poem' || opening.type === 'aside') continue;
 
 		let closingIndex = index + 1;
 		while (
@@ -199,7 +206,7 @@ export function renderCustomContainers(root: HTMLElement, defaultType: string): 
 	}
 
 	const preview = root.closest<HTMLElement>('.markdown-preview-sizer');
-	if (preview) markCrossSectionPoems(preview);
+	if (preview) markCrossSectionBlocks(preview);
 }
 
 export function restoreCustomContainers(root: HTMLElement): void {
@@ -222,15 +229,18 @@ export function restoreCustomContainers(root: HTMLElement): void {
 		container.replaceWith(opener, ...contentNodes, closer);
 	}
 
-	root.querySelectorAll('.dns-poem-segment').forEach((element) => {
+	root.querySelectorAll('.dns-poem-segment, .dns-aside-segment').forEach((element) => {
 		element.removeClasses([
 			'dns-poem-segment',
 			'dns-poem-segment--first',
 			'dns-poem-segment--last',
 			'dns-poem-segment--cjk',
+			'dns-aside-segment',
+			'dns-aside-segment--first',
+			'dns-aside-segment--last',
 		]);
 	});
-	root.querySelectorAll('.dns-poem-delimiter').forEach((element) => {
-		element.removeClass('dns-poem-delimiter');
+	root.querySelectorAll('.dns-poem-delimiter, .dns-aside-delimiter').forEach((element) => {
+		element.removeClasses(['dns-poem-delimiter', 'dns-aside-delimiter']);
 	});
 }

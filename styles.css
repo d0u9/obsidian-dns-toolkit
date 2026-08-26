@@ -91,7 +91,8 @@
 }
 
 /* Multi-stanza poems stay in Obsidian's own DOM and are styled in place. */
-.dns-poem-delimiter { display: none; }
+.dns-poem-delimiter,
+.dns-aside-delimiter { display: none; }
 
 .markdown-rendered .dns-poem-segment.dns-poem-segment {
 	margin-block: 0;
@@ -137,6 +138,38 @@
 	text-align: left;
 }
 
+/* Multi-paragraph asides span Obsidian rendering sections like poems do. */
+.markdown-rendered .dns-aside-segment.dns-aside-segment {
+	max-width: 40rem;
+	margin-block: 0;
+	margin-inline: auto;
+	padding: 0 0 0 clamp(1.1rem, 3vw, 1.6rem);
+	border-left: 1px solid #c5c4be;
+	color: #747470;
+	font-family: inherit;
+	font-size: .9em;
+	line-height: 1.75;
+	text-align: left;
+}
+
+.markdown-rendered .dns-aside-segment--first {
+	margin-top: clamp(2rem, 5vh, 3.25rem);
+	padding-top: .25rem;
+}
+
+.markdown-rendered .dns-aside-segment--last {
+	margin-bottom: clamp(2rem, 5vh, 3.25rem);
+	padding-bottom: .25rem;
+}
+
+.markdown-rendered .dns-aside-segment + .dns-aside-segment {
+	padding-top: 1em;
+}
+
+.markdown-rendered .dns-aside-segment > p {
+	margin-block: 0;
+}
+
 .dns-custom-container[data-type='imgcap'] {
 	max-width: 36rem;
 	margin: -1.75rem auto clamp(2rem, 5vh, 3rem);
@@ -180,7 +213,8 @@
 .theme-dark .dns-custom-container[data-type='lead'] { color: #b9b9b4; }
 .theme-dark .dns-custom-container:is([data-type='epigraph'], [data-type='aside']) { color: #aaa9a4; }
 .theme-dark .dns-custom-container[data-type='epigraph']::before { background: #595955; }
-.theme-dark .dns-custom-container[data-type='aside'] { border-color: #595955; }
+.theme-dark .dns-custom-container[data-type='aside'],
+.theme-dark .dns-aside-segment { border-color: #595955; }
 
 /* Settings project navigation. */
 .dns-settings-navigation {
