@@ -18,6 +18,11 @@ Blank lines after the opening delimiter and before the closing delimiter are
 recommended because they let Obsidian parse the body as full block Markdown.
 The renderer also accepts compact containers without those blank lines.
 
+`lead`, `epigraph`, `poem`, and `aside` may also hold blank lines between their
+own paragraphs. Obsidian renders such a body as several sections, so those
+blocks are styled in place instead of being wrapped, and the outer spacing goes
+to the first and last paragraph that shows text.
+
 The first word after the opening delimiter is the container type. Editorial
 styles matching the Writing style guide are included for `lead`, `epigraph`,
 `poem`, `aside`, `imgcap`, `compnote`, `center`, and `spacer`. Use `center` to

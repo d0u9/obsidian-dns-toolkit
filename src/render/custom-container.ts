@@ -13,8 +13,27 @@ const ADJACENCY_CLASSES = ['dns-before-imgcap', 'dns-before-compnote'] as const;
 const PREVIEW_CHROME = '.markdown-preview-pusher, .mod-header, .mod-footer';
 const LIST_DELIMITER_CLASS = 'dns-list-delimiter';
 
+/** Elements that end the line of rendered text they hold. */
+const LINE_TAGS = new Set([
+	'P', 'DIV', 'LI', 'OL', 'UL', 'HR', 'BLOCKQUOTE', 'PRE', 'TABLE', 'TR',
+	'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+]);
+
+/** Block types whose cross-section marker fully owns their rendering. */
+const SEGMENT_ONLY_TYPES = ['poem', 'aside', 'epigraph', 'lead'] as const;
+
 /** Block types Obsidian may split across several rendering sections. */
-const SEGMENT_TYPES = ['poem', 'aside', 'imgcap'] as const;
+const SEGMENT_TYPES = [...SEGMENT_ONLY_TYPES, 'imgcap'] as const;
+
+const CROSS_SECTION_DELIMITER = new RegExp(`:::\\s*(?:${SEGMENT_TYPES.join('|')})`, 'i');
+
+/** Whether rendered text holds a delimiter the cross-section marker owns. */
+export function containsCrossSectionDelimiter(text: string): boolean {
+	return CROSS_SECTION_DELIMITER.test(text);
+}
+
+/** Carried by every segment so one rule can style all of their bodies. */
+const SEGMENT_CLASS = 'dns-segment';
 const SEGMENT_CLASSES = [
 	...SEGMENT_TYPES.flatMap((type) => [
 		`dns-${type}-segment`,
@@ -23,6 +42,7 @@ const SEGMENT_CLASSES = [
 		`dns-${type}-delimiter`,
 	]),
 	'dns-poem-segment--cjk',
+	SEGMENT_CLASS,
 ];
 const SEGMENT_SELECTOR = SEGMENT_CLASSES.map((name) => `.${name}`).join(',');
 
@@ -56,9 +76,34 @@ function lastMeaningfulIndex(nodes: ChildNode[]): number {
 	return index;
 }
 
+/** Rendered text with a newline wherever the layout starts a new line. */
+function linedText(node: Node): string {
+	if (node.instanceOf(Text)) return node.data;
+	if (!node.instanceOf(HTMLElement)) return '';
+	if (node.instanceOf(HTMLBRElement)) return '\n';
+	const inner = Array.from(node.childNodes).map(linedText).join('');
+	return LINE_TAGS.has(node.tagName) ? `\n${inner}\n` : inner;
+}
+
+/**
+ * The one line an element shows, or null when it shows several. A compact block
+ * keeps its lines inside a single element — as `<br>`s, or as the paragraphs
+ * the compact split leaves behind — and `textContent` joins them with nothing
+ * in between. `:::poem` followed by an English line then reads as the type
+ * `poemA` with a title, while a CJK line only stops the pattern from matching.
+ */
+function singleLine(element: HTMLElement): string | null {
+	const lines = linedText(element)
+		.split('\n')
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0);
+	return lines.length === 1 ? (lines[0] ?? null) : null;
+}
+
 /** Reads an element that holds nothing but a delimiter line. */
 function delimiterRole(element: HTMLElement): string | null {
-	const text = element.textContent?.trim() ?? '';
+	const text = singleLine(element);
+	if (text === null) return null;
 	if (text === ':::') return 'close';
 	return text.match(DELIMITER)?.[1]?.toLowerCase() ?? null;
 }
@@ -141,8 +186,8 @@ function parseOpeningDelimiter(
 	};
 }
 
-function isClosingDelimiter(element: Element | undefined): boolean {
-	return element?.textContent?.trim() === ':::';
+function isClosingDelimiter(element: HTMLElement | undefined): boolean {
+	return element !== undefined && singleLine(element) === ':::';
 }
 
 function boundaryAt(root: Node, offset: number): [Node, number] {
@@ -214,23 +259,37 @@ function splitCompactDelimiterParagraphs(root: HTMLElement): void {
 	}
 }
 
+/** A delimiter line may itself be the block when paragraphs were split apart. */
+function findDelimiterParagraph(
+	block: HTMLElement | undefined,
+	matches: (text: string) => boolean,
+): HTMLElement | undefined {
+	if (!block) return undefined;
+	const candidates = block.matches('p')
+		? [block, ...Array.from(block.querySelectorAll<HTMLElement>('p'))]
+		: Array.from(block.querySelectorAll<HTMLElement>('p'));
+	return candidates.find((candidate) => matches(candidate.textContent?.trim() ?? ''));
+}
+
 function markCrossSectionBlocks(root: HTMLElement): void {
 	splitCompactDelimiterParagraphs(root);
 	clearSegmentClasses(root);
 
 	const blocks = Array.from(root.children) as HTMLElement[];
-	for (const type of ['poem', 'aside'] as const) {
+	for (const type of SEGMENT_ONLY_TYPES) {
 		for (let index = 0; index < blocks.length; index += 1) {
-			const opener = Array.from(blocks[index]?.querySelectorAll('p') ?? []).find(
-				(paragraph) => paragraph.textContent?.trim().toLowerCase() === `:::${type}`,
+			const opener = findDelimiterParagraph(
+				blocks[index],
+				(text) => text.toLowerCase() === `:::${type}`,
 			);
 			if (!opener) continue;
 
 			let closingIndex = index;
-			let closer: HTMLParagraphElement | undefined;
+			let closer: HTMLElement | undefined;
 			while (closingIndex < blocks.length && !closer) {
-				closer = Array.from(blocks[closingIndex]?.querySelectorAll('p') ?? []).find(
-					(paragraph) => paragraph.textContent?.trim() === ':::',
+				closer = findDelimiterParagraph(
+					blocks[closingIndex],
+					(text) => text === ':::',
 				);
 				if (!closer) closingIndex += 1;
 			}
@@ -243,13 +302,22 @@ function markCrossSectionBlocks(root: HTMLElement): void {
 				blockSegments.map((block) => block.textContent ?? '').join(''),
 			);
 			for (const block of blockSegments) {
-				block.addClass(segmentClass);
+				block.addClasses([SEGMENT_CLASS, segmentClass]);
 				if (type === 'poem' && isCjk) block.addClass('dns-poem-segment--cjk');
 			}
-			blockSegments[0]?.addClass(`${segmentClass}--first`);
-			blockSegments[blockSegments.length - 1]?.addClass(`${segmentClass}--last`);
 			opener.addClass(delimiterClass);
 			closer.addClass(delimiterClass);
+
+			// A delimiter on its own line leaves an empty block behind; hide it so
+			// the outer spacing lands on the first and last blocks that show text.
+			const visible = blockSegments.filter((block) => {
+				if (delimiterRole(block) === null) return true;
+				block.addClass(delimiterClass);
+				return false;
+			});
+			const bounds = visible.length > 0 ? visible : blockSegments;
+			bounds[0]?.addClass(`${segmentClass}--first`);
+			bounds[bounds.length - 1]?.addClass(`${segmentClass}--last`);
 			index = closingIndex;
 		}
 	}
@@ -284,7 +352,9 @@ function markCrossSectionImgcaps(root: HTMLElement): void {
 		if (first < 0 || last < first) continue;
 
 		const segments = blocks.slice(first, last + 1);
-		for (const segment of segments) segment.addClass('dns-imgcap-segment');
+		for (const segment of segments) {
+			segment.addClasses([SEGMENT_CLASS, 'dns-imgcap-segment']);
+		}
 		opener.addClass('dns-imgcap-delimiter');
 		closer.addClass('dns-imgcap-delimiter');
 
@@ -309,13 +379,12 @@ export function renderCustomContainers(root: HTMLElement, defaultType: string): 
 	clearAdjacencyClasses(root);
 	splitCompactDelimiterParagraphs(root);
 
-	const children = Array.from(root.children);
+	const children = Array.from(root.children) as HTMLElement[];
 	for (let index = 0; index < children.length; index += 1) {
 		const opener = children[index];
 		if (!opener) continue;
-		const opening = parseOpeningDelimiter(opener.textContent?.trim() ?? '', defaultType);
+		const opening = parseOpeningDelimiter(singleLine(opener) ?? '', defaultType);
 		if (!opening) continue;
-		if (opening.type === 'poem' || opening.type === 'aside') continue;
 
 		let closingIndex = index + 1;
 		while (
@@ -326,6 +395,14 @@ export function renderCustomContainers(root: HTMLElement, defaultType: string): 
 		}
 		const closer = children[closingIndex];
 		if (!closer) continue;
+
+		// These types are marked in place so Obsidian keeps owning their sections.
+		// Skip past the closer too, or it would read as the next block's opener.
+		const segmentOnly = SEGMENT_ONLY_TYPES.some((type) => type === opening.type);
+		if (segmentOnly && !opening.title && !opening.height) {
+			index = closingIndex;
+			continue;
+		}
 
 		const container = createDiv({ cls: 'dns-custom-container' });
 		container.dataset.type = opening.type;

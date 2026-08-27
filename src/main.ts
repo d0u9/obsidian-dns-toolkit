@@ -1,6 +1,7 @@
 import { MarkdownView, Notice, Plugin } from 'obsidian';
 import { registerCommands } from './commands';
 import {
+	containsCrossSectionDelimiter,
 	renderCustomContainers,
 	restoreCustomContainers,
 } from './render/custom-container';
@@ -58,7 +59,7 @@ export default class DnsToolkitPlugin extends Plugin {
 	private hasCrossSectionContainer(preview: HTMLElement): boolean {
 		// A compact block leaves no newline in textContent (the line break is a
 		// <br>), so match the delimiter wherever it lands.
-		return /:::\s*(?:poem|aside|imgcap)/i.test(preview.textContent ?? '');
+		return containsCrossSectionDelimiter(preview.textContent ?? '');
 	}
 
 	private observeCrossSectionContainers(): void {

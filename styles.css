@@ -44,8 +44,20 @@
 	white-space: pre-wrap;
 }
 
+/* Outer gaps are shared by the boxed and the segmented form of each block. */
+.dns-custom-container[data-type='lead'],
+.markdown-rendered .dns-lead-segment {
+	--dns-lead-gap: clamp(2.5rem, 6.25vh, 3.75rem);
+}
+
+.dns-custom-container[data-type='epigraph'],
+.markdown-rendered .dns-epigraph-segment {
+	--dns-epigraph-gap-top: clamp(3.25rem, 8.75vh, 5.5rem);
+	--dns-epigraph-gap-bottom: clamp(3.75rem, 10vh, 6.25rem);
+}
+
 .dns-custom-container[data-type='lead'] {
-	margin: 0 0 clamp(2rem, 5vh, 3rem);
+	margin: var(--dns-lead-gap) 0;
 	color: #666662;
 	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
 	font-size: .94em;
@@ -56,7 +68,7 @@
 .dns-custom-container[data-type='epigraph'] {
 	position: relative;
 	max-width: 30rem;
-	margin: clamp(2.5rem, 7vh, 4.5rem) auto clamp(3rem, 8vh, 5rem);
+	margin: var(--dns-epigraph-gap-top) auto var(--dns-epigraph-gap-bottom);
 	padding-top: 1.25rem;
 	color: #747470;
 	font-family: inherit;
@@ -95,7 +107,55 @@
 /* Multi-stanza poems stay in Obsidian's own DOM and are styled in place. */
 .dns-poem-delimiter,
 .dns-aside-delimiter,
+.dns-epigraph-delimiter,
+.dns-lead-delimiter,
 .dns-imgcap-delimiter { display: none; }
+
+/* One rule for every editorial block body, boxed or segmented: a list keeps
+   the block's own type instead of falling back to the theme's list styling.
+   The class is doubled so a theme rule on `li` cannot outweigh it. */
+.markdown-rendered .dns-segment.dns-segment :is(p, ol, ul, li),
+.markdown-rendered .dns-segment.dns-segment li::marker,
+.dns-custom-container:is(
+	[data-type='lead'],
+	[data-type='epigraph'],
+	[data-type='poem'],
+	[data-type='aside'],
+	[data-type='imgcap'],
+	[data-type='compnote']
+) .dns-custom-container__content :is(p, ol, ul, li),
+.dns-custom-container:is(
+	[data-type='lead'],
+	[data-type='epigraph'],
+	[data-type='poem'],
+	[data-type='aside'],
+	[data-type='imgcap'],
+	[data-type='compnote']
+) .dns-custom-container__content li::marker {
+	margin-block: 0;
+	color: inherit;
+	font-family: inherit;
+	font-size: inherit;
+	font-weight: inherit;
+	letter-spacing: inherit;
+	line-height: inherit;
+}
+
+/* A list adds only its marker column. `pre-wrap`/`pre-line` on the block would
+   otherwise turn the list's own source newlines into blank lines. */
+.markdown-rendered .dns-segment.dns-segment :is(ol, ul),
+.dns-custom-container:is(
+	[data-type='lead'],
+	[data-type='epigraph'],
+	[data-type='poem'],
+	[data-type='aside'],
+	[data-type='imgcap'],
+	[data-type='compnote']
+) .dns-custom-container__content :is(ol, ul) {
+	margin-inline: 0;
+	padding-inline-start: 1.75em;
+	white-space: normal;
+}
 
 .markdown-rendered .dns-poem-segment.dns-poem-segment {
 	margin-block: 0;
@@ -116,12 +176,8 @@
 	padding-bottom: clamp(1.25rem, 3vh, 1.75rem);
 }
 
-.markdown-rendered .dns-poem-segment + .dns-poem-segment {
+.markdown-rendered .dns-poem-segment + .dns-poem-segment:not(.dns-poem-segment--first) {
 	padding-top: .8em;
-}
-
-.markdown-rendered .dns-poem-segment > p {
-	margin-block: 0;
 }
 
 .markdown-rendered .dns-poem-segment--cjk {
@@ -129,9 +185,14 @@
 	line-height: 1.92;
 }
 
+.dns-custom-container[data-type='aside'],
+.markdown-rendered .dns-aside-segment {
+	--dns-aside-gap: clamp(3.75rem, 9.5vh, 6rem);
+}
+
 .dns-custom-container[data-type='aside'] {
 	max-width: 40rem;
-	margin: clamp(2rem, 5vh, 3.25rem) auto;
+	margin: var(--dns-aside-gap) auto;
 	padding: .25rem 0 .25rem clamp(1.1rem, 3vw, 1.6rem);
 	border-left: 1px solid #c5c4be;
 	color: #747470;
@@ -156,38 +217,108 @@
 }
 
 .markdown-rendered .dns-aside-segment--first {
-	margin-top: clamp(2rem, 5vh, 3.25rem);
+	margin-top: var(--dns-aside-gap);
 	padding-top: .25rem;
 }
 
 .markdown-rendered .dns-aside-segment--last {
-	margin-bottom: clamp(2rem, 5vh, 3.25rem);
+	margin-bottom: var(--dns-aside-gap);
 	padding-bottom: .25rem;
 }
 
-.markdown-rendered .dns-aside-segment + .dns-aside-segment {
+.markdown-rendered .dns-aside-segment + .dns-aside-segment:not(.dns-aside-segment--first) {
 	padding-top: 1em;
 }
 
-.markdown-rendered .dns-aside-segment > p {
+/* Multi-paragraph epigraphs span Obsidian rendering sections like poems do. */
+.markdown-rendered .dns-epigraph-segment.dns-epigraph-segment {
+	position: relative;
+	max-width: 30rem;
 	margin-block: 0;
+	margin-inline: auto;
+	color: #747470;
+	font-family: inherit;
+	font-size: .9em;
+	line-height: 1.75;
+	text-align: right;
+}
+
+.markdown-rendered .dns-epigraph-segment--first {
+	margin-top: var(--dns-epigraph-gap-top);
+	padding-top: 1.25rem;
+}
+
+.markdown-rendered .dns-epigraph-segment--first::before {
+	position: absolute;
+	top: 0;
+	left: 50%;
+	width: 2.5rem;
+	height: 1px;
+	background: #c9c8c2;
+	content: '';
+	transform: translateX(-50%);
+}
+
+.markdown-rendered .dns-epigraph-segment--last {
+	margin-bottom: var(--dns-epigraph-gap-bottom);
+}
+
+.markdown-rendered .dns-epigraph-segment + .dns-epigraph-segment:not(.dns-epigraph-segment--first) {
+	padding-top: 1em;
+}
+
+/* Multi-paragraph leads span Obsidian rendering sections like poems do. */
+.markdown-rendered .dns-lead-segment.dns-lead-segment {
+	margin-block: 0;
+	color: #666662;
+	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
+	font-size: .94em;
+	line-height: 1.75;
+	text-align: left;
+}
+
+.markdown-rendered .dns-lead-segment--first {
+	margin-top: var(--dns-lead-gap);
+}
+
+.markdown-rendered .dns-lead-segment--last {
+	margin-bottom: var(--dns-lead-gap);
+}
+
+.markdown-rendered .dns-lead-segment + .dns-lead-segment:not(.dns-lead-segment--first) {
+	padding-top: 1em;
+}
+
+/* One source of truth for caption type, so the boxed caption, the segmented
+   caption, and any list inside either of them render in the same font. */
+.dns-custom-container[data-type='imgcap'],
+.markdown-rendered .dns-imgcap-segment {
+	--dns-imgcap-color: #8a8a86;
+	--dns-imgcap-font-family: var(--font-text, inherit);
+	--dns-imgcap-font-size: .68rem;
+	--dns-imgcap-font-weight: var(--font-normal, 400);
+	--dns-imgcap-line-height: 1.55;
 }
 
 .dns-custom-container[data-type='imgcap'] {
 	max-width: none;
 	margin: -.75rem 0 clamp(2rem, 5vh, 3rem);
-	color: #8a8a86;
-	font-size: .68rem;
-	line-height: 1.55;
+	color: var(--dns-imgcap-color);
+	font-family: var(--dns-imgcap-font-family);
+	font-size: var(--dns-imgcap-font-size);
+	font-weight: var(--dns-imgcap-font-weight);
+	line-height: var(--dns-imgcap-line-height);
 	text-align: left;
 }
 
 /* Multi-block captions span Obsidian rendering sections like poems do. */
 .markdown-rendered .dns-imgcap-segment.dns-imgcap-segment {
 	margin-block: 0;
-	color: #8a8a86;
-	font-size: .68rem;
-	line-height: 1.55;
+	color: var(--dns-imgcap-color);
+	font-family: var(--dns-imgcap-font-family);
+	font-size: var(--dns-imgcap-font-size);
+	font-weight: var(--dns-imgcap-font-weight);
+	line-height: var(--dns-imgcap-line-height);
 	text-align: left;
 }
 
@@ -199,27 +330,6 @@
 	margin-bottom: clamp(2rem, 5vh, 3rem);
 }
 
-.markdown-rendered .dns-imgcap-segment :is(p, ol, ul, li) {
-	margin-block: 0;
-	color: inherit;
-	font-family: inherit;
-	font-size: inherit;
-	font-weight: inherit;
-	letter-spacing: inherit;
-	line-height: inherit;
-}
-
-/* Lists stay caption text; only the marker column adds indentation. */
-.markdown-rendered .dns-imgcap-segment :is(ol, ul) {
-	margin-inline: 0;
-	padding-inline-start: 1.75em;
-}
-
-.markdown-rendered .dns-imgcap-segment li::marker {
-	color: inherit;
-	font: inherit;
-}
-
 /* A delimiter swallowed by a list item is wrapped so it can be hidden. */
 .markdown-rendered .dns-list-delimiter.dns-imgcap-delimiter {
 	display: none;
@@ -227,37 +337,6 @@
 
 .markdown-rendered .dns-before-imgcap.dns-before-imgcap {
 	margin-bottom: 0;
-}
-
-.dns-custom-container[data-type='imgcap'] .dns-custom-container__content > p {
-	margin-block: 0;
-}
-
-/* Lists remain caption text; only their marker indentation differs. */
-.dns-custom-container[data-type='imgcap'] .dns-custom-container__content :is(ol, ul) {
-	margin-block: 0;
-	margin-inline: 0;
-	padding-inline-start: 1.75em;
-	color: inherit;
-	font-family: inherit;
-	font-size: inherit;
-	font-weight: inherit;
-	letter-spacing: inherit;
-	line-height: inherit;
-}
-
-.dns-custom-container[data-type='imgcap'] .dns-custom-container__content li,
-.dns-custom-container[data-type='imgcap'] .dns-custom-container__content li > p,
-.dns-custom-container[data-type='imgcap'] .dns-custom-container__content li::marker {
-	margin-block: 0;
-	color: inherit;
-	font: inherit;
-	letter-spacing: inherit;
-}
-
-/* `pre-line` would turn the list's source newlines into blank lines. */
-.dns-custom-container[data-type='imgcap'] .dns-custom-container__content :is(ol, ul) {
-	white-space: normal;
 }
 
 .dns-custom-container[data-type='imgcap'] .dns-custom-container__content,
@@ -299,10 +378,14 @@
 
 /* Keep the same hierarchy legible against Obsidian's dark background. */
 .theme-dark .dns-custom-container[data-type='lead'] { color: #b9b9b4; }
+.theme-dark .markdown-rendered .dns-lead-segment.dns-lead-segment { color: #b9b9b4; }
 .theme-dark .dns-custom-container:is([data-type='epigraph'], [data-type='aside']) { color: #aaa9a4; }
-.theme-dark .dns-custom-container[data-type='epigraph']::before { background: #595955; }
+.theme-dark .markdown-rendered .dns-epigraph-segment.dns-epigraph-segment,
+.theme-dark .markdown-rendered .dns-aside-segment.dns-aside-segment { color: #aaa9a4; }
+.theme-dark .dns-custom-container[data-type='epigraph']::before,
+.theme-dark .markdown-rendered .dns-epigraph-segment--first::before { background: #595955; }
 .theme-dark .dns-custom-container[data-type='aside'],
-.theme-dark .dns-aside-segment { border-color: #595955; }
+.theme-dark .markdown-rendered .dns-aside-segment.dns-aside-segment { border-color: #595955; }
 
 /* Settings project navigation. */
 .dns-settings-navigation {
@@ -376,7 +459,13 @@
 	line-height: var(--dns-line-height);
 }
 
-.dns-page-typography .markdown-rendered .el-p:not(.dns-poem-segment) > p {
+.dns-page-typography .markdown-rendered .el-p:not(
+	.dns-poem-segment,
+	.dns-aside-segment,
+	.dns-epigraph-segment,
+	.dns-lead-segment,
+	.dns-imgcap-segment
+) > p {
 	margin-block-end: var(--dns-paragraph-spacing);
 }
 
