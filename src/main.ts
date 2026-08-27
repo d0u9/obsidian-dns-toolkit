@@ -56,9 +56,9 @@ export default class DnsToolkitPlugin extends Plugin {
 	}
 
 	private hasCrossSectionContainer(preview: HTMLElement): boolean {
-		return Array.from(preview.querySelectorAll('p')).some((paragraph) =>
-			/^:::\s*(?:poem|aside)(?:\s|$)/i.test(paragraph.textContent?.trim() ?? ''),
-		);
+		// A compact block leaves no newline in textContent (the line break is a
+		// <br>), so match the delimiter wherever it lands.
+		return /:::\s*(?:poem|aside|imgcap)/i.test(preview.textContent ?? '');
 	}
 
 	private observeCrossSectionContainers(): void {

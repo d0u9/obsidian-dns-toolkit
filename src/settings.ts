@@ -43,14 +43,28 @@ export const DEFAULT_SETTINGS: DnsToolkitSettings = {
 	editingParagraphSpacing: 1,
 };
 
-const SUPPORTED_BLOCKS = [
+const SUPPORTED_BLOCKS: readonly {
+	type: string;
+	description: string;
+	example?: string;
+}[] = [
 	{ type: 'lead', description: 'Opening introduction' },
 	{ type: 'epigraph', description: 'Quotation or epigraph' },
 	{ type: 'poem', description: 'Verse with stanza spacing' },
 	{ type: 'aside', description: 'Supporting note or context' },
 	{ type: 'imgcap', description: 'Image caption' },
 	{ type: 'compnote', description: 'Closing composition note' },
-] as const;
+	{
+		type: 'center',
+		description: 'Centered text; adjust the height value as needed',
+		example: ':::center{height=120px}',
+	},
+	{
+		type: 'spacer',
+		description: 'Vertical blank space; adjust the height value as needed',
+		example: ':::spacer{height=5rem}',
+	},
+];
 
 export class DnsToolkitSettingTab extends PluginSettingTab {
 	private activeSection: 'containers' | 'typography' = 'containers';
@@ -92,7 +106,7 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 						name: 'Supported blocks',
 						desc: 'Block types with dedicated editorial styles.',
 						items: SUPPORTED_BLOCKS.map((block) => ({
-							name: `:::${block.type}`,
+							name: block.example ?? `:::${block.type}`,
 							desc: block.description,
 						})),
 					},
@@ -274,7 +288,7 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 		const blockList = this.containerEl.createDiv({ cls: 'dns-colon-block-list' });
 		for (const block of SUPPORTED_BLOCKS) {
 			const item = blockList.createDiv({ cls: 'dns-colon-block-list__item' });
-			item.createEl('code', { text: `:::${block.type}` });
+			item.createEl('code', { text: block.example ?? `:::${block.type}` });
 			item.createSpan({ text: block.description });
 		}
 	}

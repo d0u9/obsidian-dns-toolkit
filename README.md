@@ -20,8 +20,36 @@ The renderer also accepts compact containers without those blank lines.
 
 The first word after the opening delimiter is the container type. Editorial
 styles matching the Writing style guide are included for `lead`, `epigraph`,
-`poem`, `aside`, `imgcap`, and `compnote`. Unknown types use a generic accented
-container. Every type is exposed as a `data-type` attribute for custom CSS.
+`poem`, `aside`, `imgcap`, `compnote`, `center`, and `spacer`. Use `center` to
+center the block's contents and an empty `spacer` block to add vertical space.
+Unknown types use a generic accented container. Every type is exposed as a
+`data-type` attribute for custom CSS.
+
+Add a fixed or relative block height with a `height` attribute. Supported units
+are `px`, `rem`, `em`, `vh`, `vw`, `vmin`, `vmax`, and `%`:
+
+```markdown
+:::center{height=120px}
+
+Centered content
+
+:::
+
+:::spacer{height=5rem}
+:::
+```
+
+An `imgcap` block may mix paragraphs and lists. Lists keep the caption's font,
+colour, and line height, and only add the indentation their markers need:
+
+```markdown
+:::imgcap
+Sample photograph from this site
+
+1. img1 is test
+2. img2 is test
+:::
+```
 
 Containers are rendered in Reading view. Use the **Insert custom container**
 command to wrap selected text or insert a new container.

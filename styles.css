@@ -25,7 +25,9 @@
 	[data-type='poem'],
 	[data-type='aside'],
 	[data-type='imgcap'],
-	[data-type='compnote']
+	[data-type='compnote'],
+	[data-type='center'],
+	[data-type='spacer']
 ) {
 	padding: 0;
 	border: 0;
@@ -92,7 +94,8 @@
 
 /* Multi-stanza poems stay in Obsidian's own DOM and are styled in place. */
 .dns-poem-delimiter,
-.dns-aside-delimiter { display: none; }
+.dns-aside-delimiter,
+.dns-imgcap-delimiter { display: none; }
 
 .markdown-rendered .dns-poem-segment.dns-poem-segment {
 	margin-block: 0;
@@ -179,12 +182,82 @@
 	text-align: left;
 }
 
+/* Multi-block captions span Obsidian rendering sections like poems do. */
+.markdown-rendered .dns-imgcap-segment.dns-imgcap-segment {
+	margin-block: 0;
+	color: #8a8a86;
+	font-size: .68rem;
+	line-height: 1.55;
+	text-align: left;
+}
+
+.markdown-rendered .dns-imgcap-segment--first {
+	margin-top: -.75rem;
+}
+
+.markdown-rendered .dns-imgcap-segment--last {
+	margin-bottom: clamp(2rem, 5vh, 3rem);
+}
+
+.markdown-rendered .dns-imgcap-segment :is(p, ol, ul, li) {
+	margin-block: 0;
+	color: inherit;
+	font-family: inherit;
+	font-size: inherit;
+	font-weight: inherit;
+	letter-spacing: inherit;
+	line-height: inherit;
+}
+
+/* Lists stay caption text; only the marker column adds indentation. */
+.markdown-rendered .dns-imgcap-segment :is(ol, ul) {
+	margin-inline: 0;
+	padding-inline-start: 1.75em;
+}
+
+.markdown-rendered .dns-imgcap-segment li::marker {
+	color: inherit;
+	font: inherit;
+}
+
+/* A delimiter swallowed by a list item is wrapped so it can be hidden. */
+.markdown-rendered .dns-list-delimiter.dns-imgcap-delimiter {
+	display: none;
+}
+
 .markdown-rendered .dns-before-imgcap.dns-before-imgcap {
 	margin-bottom: 0;
 }
 
 .dns-custom-container[data-type='imgcap'] .dns-custom-container__content > p {
 	margin-block: 0;
+}
+
+/* Lists remain caption text; only their marker indentation differs. */
+.dns-custom-container[data-type='imgcap'] .dns-custom-container__content :is(ol, ul) {
+	margin-block: 0;
+	margin-inline: 0;
+	padding-inline-start: 1.75em;
+	color: inherit;
+	font-family: inherit;
+	font-size: inherit;
+	font-weight: inherit;
+	letter-spacing: inherit;
+	line-height: inherit;
+}
+
+.dns-custom-container[data-type='imgcap'] .dns-custom-container__content li,
+.dns-custom-container[data-type='imgcap'] .dns-custom-container__content li > p,
+.dns-custom-container[data-type='imgcap'] .dns-custom-container__content li::marker {
+	margin-block: 0;
+	color: inherit;
+	font: inherit;
+	letter-spacing: inherit;
+}
+
+/* `pre-line` would turn the list's source newlines into blank lines. */
+.dns-custom-container[data-type='imgcap'] .dns-custom-container__content :is(ol, ul) {
+	white-space: normal;
 }
 
 .dns-custom-container[data-type='imgcap'] .dns-custom-container__content,
@@ -206,6 +279,21 @@
 }
 
 .markdown-rendered hr.dns-before-compnote {
+	display: none;
+}
+
+.dns-custom-container[data-type='center'] {
+	margin: 1em 0;
+	text-align: center;
+}
+
+.dns-custom-container[data-type='spacer'] {
+	height: clamp(3rem, 7vh, 5rem);
+	margin: 0;
+}
+
+.dns-custom-container[data-type='spacer'] .dns-custom-container__title,
+.dns-custom-container[data-type='spacer'] .dns-custom-container__content {
 	display: none;
 }
 
