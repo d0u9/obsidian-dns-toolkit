@@ -1,4 +1,4 @@
-import { FileSystemAdapter, Notice, Platform, normalizePath } from 'obsidian';
+import { FileSystemAdapter, Notice, Platform, TFile, normalizePath } from 'obsidian';
 import type DnsToolkitPlugin from '../main';
 import { compareFolders, readFileDiff, type ChangeStatus } from './folder-diff';
 import { ConfirmPublishingModal, PublishingFolderSuggestModal } from './modals';
@@ -10,6 +10,17 @@ export type PublishingTargetKind = 'missing' | 'folder' | 'file' | 'symlink';
 export type PublishDecision =
 	| { path: string; status: ChangeStatus; kind: 'keep-destination' }
 	| { path: string; kind: 'merge'; text: string };
+
+// Publishing pushes the vault outwards; a pull carries a change made at the
+// destination back into the note it came from.
+export type VaultPull =
+	| { path: string; kind: 'text'; text: string }
+	| { path: string; kind: 'copy' };
+
+export interface PublishPlan {
+	decisions: PublishDecision[];
+	pulls: VaultPull[];
+}
 
 const STALE_WORK_FOLDER_AGE_MS = 60 * 60 * 1000;
 
@@ -75,19 +86,31 @@ export async function chooseAndPublishFolder(plugin: DnsToolkitPlugin): Promise<
 		new PublishingFolderSuggestModal(plugin.app, folders, (folder) => {
 			const source = pathModule.join(sourceRoot, folder);
 			const target = pathModule.join(targetRoot, folder);
-			void openConfirmation(plugin, folder, source, target, targetRootMissing ? targetRoot : null);
+			void openConfirmation(plugin, {
+				folder,
+				source,
+				target,
+				vaultFolder: `${sourceSetting}/${folder}`,
+				missingTargetRoot: targetRootMissing ? targetRoot : null,
+			});
 		}).open();
 	} catch (error) {
 		new Notice(`Could not read the publishing source: ${errorMessage(error)}`);
 	}
 }
 
+interface ConfirmationRequest {
+	folder: string;
+	source: string;
+	target: string;
+	/** Vault-relative folder, so a pull can be written through the vault API. */
+	vaultFolder: string;
+	missingTargetRoot: string | null;
+}
+
 async function openConfirmation(
 	plugin: DnsToolkitPlugin,
-	folder: string,
-	source: string,
-	target: string,
-	missingTargetRoot: string | null,
+	{ folder, source, target, vaultFolder, missingTargetRoot }: ConfirmationRequest,
 ): Promise<void> {
 	const { fileSystem } = loadDesktopNodeModules();
 	let targetKind: PublishingTargetKind = 'missing';
@@ -123,16 +146,16 @@ async function openConfirmation(
 			change.status === 'added' ? null : pathModule.join(target, change.path),
 			fileSystem,
 		),
-		onConfirm: (decisions) => void publishFolder(source, target, folder, decisions),
+		onConfirm: (plan) => void publishFolder(plugin, { folder, source, target, vaultFolder }, plan),
 	}).open();
 }
 
 async function publishFolder(
-	source: string,
-	target: string,
-	folder: string,
-	decisions: PublishDecision[],
+	plugin: DnsToolkitPlugin,
+	{ folder, source, target, vaultFolder }: Omit<ConfirmationRequest, 'missingTargetRoot'>,
+	plan: PublishPlan,
 ): Promise<void> {
+	const { decisions } = plan;
 	const { fileSystem, pathModule } = loadDesktopNodeModules();
 	const parent = pathModule.dirname(target);
 	const suffix = `${Date.now()}-${crypto.randomUUID()}`;
@@ -165,6 +188,8 @@ async function publishFolder(
 		new Notice(decisions.length === 0
 			? `Published “${folder}” successfully.`
 			: `Published “${folder}” successfully with ${decisions.length} ${decisions.length === 1 ? 'file' : 'files'} you adjusted.`);
+		// Only once the destination is safely in place.
+		await pullIntoVault(plugin, vaultFolder, target, plan.pulls, fileSystem, pathModule);
 	} catch (error) {
 		await fileSystem.rm(staging, { recursive: true, force: true }).catch(() => undefined);
 		if (movedExistingTarget) {
@@ -173,6 +198,52 @@ async function publishFolder(
 		new Notice(`Could not publish “${folder}”: ${errorMessage(error)}`);
 	} finally {
 		publishInProgress = false;
+	}
+}
+
+/**
+ * Writes the chosen destination content back into the vault. This goes through
+ * the vault API rather than the file system, so Obsidian sees the change in an
+ * open note instead of overwriting it from its own buffer.
+ */
+async function pullIntoVault(
+	plugin: DnsToolkitPlugin,
+	vaultFolder: string,
+	target: string,
+	pulls: VaultPull[],
+	fileSystem: typeof import('node:fs/promises'),
+	pathModule: typeof import('node:path'),
+): Promise<void> {
+	if (pulls.length === 0) return;
+	let updated = 0;
+	const failures: string[] = [];
+	for (const pull of pulls) {
+		const vaultPath = normalizePath(`${vaultFolder}/${pull.path}`);
+		const file = plugin.app.vault.getAbstractFileByPath(vaultPath);
+		if (!(file instanceof TFile)) {
+			failures.push(pull.path);
+			continue;
+		}
+		try {
+			if (pull.kind === 'text') {
+				await plugin.app.vault.modify(file, pull.text);
+			} else {
+				const bytes = await fileSystem.readFile(pathModule.join(target, pull.path));
+				const buffer = new ArrayBuffer(bytes.byteLength);
+				new Uint8Array(buffer).set(bytes);
+				await plugin.app.vault.modifyBinary(file, buffer);
+			}
+			updated += 1;
+		} catch {
+			failures.push(pull.path);
+		}
+	}
+
+	if (updated > 0) {
+		new Notice(`Updated ${updated} vault ${updated === 1 ? 'file' : 'files'} from the destination.`);
+	}
+	if (failures.length > 0) {
+		new Notice(`Could not update ${failures.length} vault ${failures.length === 1 ? 'file' : 'files'}: ${failures.join(', ')}`);
 	}
 }
 

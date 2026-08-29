@@ -1,5 +1,5 @@
-import { FuzzySuggestModal, Modal, Setting } from 'obsidian';
-import type { PublishDecision, PublishingTargetKind } from './folder-publisher';
+import { FuzzySuggestModal, Modal, Setting, type ToggleComponent } from 'obsidian';
+import type { PublishPlan, PublishDecision, PublishingTargetKind, VaultPull } from './folder-publisher';
 import {
 	mergeRows,
 	type DiffCell,
@@ -59,7 +59,7 @@ export interface ConfirmPublishingOptions {
 		plannedDestination: string;
 	};
 	loadDiff: (change: FolderChange) => Promise<FileDiff>;
-	onConfirm: (decisions: PublishDecision[]) => void;
+	onConfirm: (plan: PublishPlan) => void;
 }
 
 export class ConfirmPublishingModal extends Modal {
@@ -68,6 +68,8 @@ export class ConfirmPublishingModal extends Modal {
 	private readonly keptPaths = new Set<string>();
 	// Per file, the runs of changed lines to take from the destination instead.
 	private readonly keptHunks = new Map<string, Set<number>>();
+	// Files whose chosen result is also written back into the vault.
+	private readonly pulledPaths = new Set<string>();
 	private readonly loadedDiffs = new Map<string, { rows: DiffRow[]; hunkCount: number; trailingNewline: boolean }>();
 	private objectUrls: string[] = [];
 
@@ -146,7 +148,7 @@ export class ConfirmPublishingModal extends Modal {
 				.setButtonText(this.options.targetKind === 'missing' ? 'Copy' : 'Replace')
 				.onClick(() => {
 					this.close();
-					this.options.onConfirm(this.decisions());
+					this.options.onConfirm({ decisions: this.decisions(), pulls: this.pulls() });
 				}));
 	}
 
@@ -169,6 +171,36 @@ export class ConfirmPublishingModal extends Modal {
 		return decisions;
 	}
 
+	/** The content this file ends up with, or null when it stays as it is. */
+	private mergedText(path: string): string | null {
+		const diff = this.loadedDiffs.get(path);
+		if (!diff) return null;
+		const hunks = this.keptHunks.get(path) ?? new Set<number>();
+		if (hunks.size === 0) return null;
+		const merged = mergeRows(diff.rows, hunks, diff.trailingNewline);
+		// An all-vault selection reproduces the note, so there is nothing to pull.
+		return merged === mergeRows(diff.rows, new Set(), diff.trailingNewline) ? null : merged;
+	}
+
+	private canPull(change: FolderChange): boolean {
+		if (change.status !== 'modified') return false;
+		if (this.loadedDiffs.has(change.path)) return this.mergedText(change.path) !== null;
+		// A file without a line diff can only be taken from the destination whole.
+		return this.keptPaths.has(change.path);
+	}
+
+	private pulls(): VaultPull[] {
+		const pulls: VaultPull[] = [];
+		for (const change of this.comparison?.changes ?? []) {
+			if (!this.pulledPaths.has(change.path) || !this.canPull(change)) continue;
+			const text = this.mergedText(change.path);
+			pulls.push(text === null
+				? { path: change.path, kind: 'copy' }
+				: { path: change.path, kind: 'text', text });
+		}
+		return pulls;
+	}
+
 	// A file counts as kept whole when every one of its runs was taken from the
 	// destination, which is also what the file-level buttons set.
 	private isWhollyKept(path: string): boolean {
@@ -176,6 +208,14 @@ export class ConfirmPublishingModal extends Modal {
 		const diff = this.loadedDiffs.get(path);
 		const hunks = this.keptHunks.get(path);
 		return !!diff && diff.hunkCount > 0 && hunks?.size === diff.hunkCount;
+	}
+
+	private pullCount(): number {
+		let count = 0;
+		for (const change of this.comparison?.changes ?? []) {
+			if (this.pulledPaths.has(change.path) && this.canPull(change)) count += 1;
+		}
+		return count;
 	}
 
 	private partialCount(): number {
@@ -260,6 +300,13 @@ export class ConfirmPublishingModal extends Modal {
 				text: CHANGE_LABELS[change.status],
 			});
 			open.createSpan({ cls: 'dns-publishing-change__path', text: change.path });
+			if (this.pulledPaths.has(change.path) && this.canPull(change)) {
+				open.createSpan({
+					cls: 'dns-publishing-change__pull',
+					text: '↩ vault',
+					attr: { 'aria-label': 'Also written back to the vault' },
+				});
+			}
 			open.onClickEvent(() => void this.renderDiff(change));
 		}
 
@@ -267,6 +314,13 @@ export class ConfirmPublishingModal extends Modal {
 			section.createDiv({
 				cls: 'dns-publishing-changes__note',
 				text: `${keptCount} unchecked ${keptCount === 1 ? 'file keeps' : 'files keep'} the current destination version.`,
+			});
+		}
+		const pullCount = this.pullCount();
+		if (pullCount > 0) {
+			section.createDiv({
+				cls: 'dns-publishing-changes__note',
+				text: `${pullCount} ${pullCount === 1 ? 'note is' : 'notes are'} also updated in the vault from the destination.`,
 			});
 		}
 		if (partialCount > 0) {
@@ -352,6 +406,37 @@ export class ConfirmPublishingModal extends Modal {
 		return refresh;
 	}
 
+	/**
+	 * Publishing sends the choice outwards; this sends the same choice back into
+	 * the note, so a change made at the destination stops reappearing as a diff.
+	 */
+	private renderPullSetting(change: FolderChange): () => void {
+		if (change.status !== 'modified') return () => {};
+		const setting = new Setting(this.contentEl)
+			.setName('Also update the vault file')
+			.setDesc('Write the result back to the note, so the two sides stop differing.');
+		let toggleComponent: ToggleComponent | null = null;
+		setting.addToggle((toggle) => {
+			toggleComponent = toggle;
+			toggle
+				.setValue(this.pulledPaths.has(change.path))
+				.onChange((value) => {
+					if (value) this.pulledPaths.add(change.path);
+					else this.pulledPaths.delete(change.path);
+				});
+		});
+
+		return () => {
+			const available = this.canPull(change);
+			setting.settingEl.toggleClass('is-disabled', !available);
+			setting.setDesc(available
+				? 'Write the result back to the note, so the two sides stop differing.'
+				: 'Nothing to pull: every line here already matches the vault.');
+			toggleComponent?.setDisabled(!available);
+			if (!available) toggleComponent?.setValue(false);
+		};
+	}
+
 	private renderImageDiff(
 		body: HTMLElement,
 		before: ImageFile | null,
@@ -411,7 +496,13 @@ export class ConfirmPublishingModal extends Modal {
 		this.contentEl.addClass('dns-publishing-content--diff');
 		this.renderDiffPaths(change);
 		let repaint = (): void => {};
-		const refreshChooser = this.renderSideChooser(change, () => repaint());
+		let refreshPull = (): void => {};
+		const refreshChooser = this.renderSideChooser(change, () => {
+			repaint();
+			refreshPull();
+		});
+		refreshPull = this.renderPullSetting(change);
+		refreshPull();
 		const body = this.contentEl.createDiv({ cls: 'dns-publishing-diff' });
 		body.createDiv({ cls: 'dns-publishing-diff__note', text: 'Loading…' });
 

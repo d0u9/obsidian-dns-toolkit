@@ -110,7 +110,10 @@ copy has completed. The confirmation lists every file that will be added,
 modified, or removed; selecting one shows the current destination and what is
 about to be published side by side. Either version can be chosen for the whole
 file, or one side at a time for each run of changed lines, in which case the
-file is published as a merge of both. Pressing Escape there returns to the list
+file is published as a merge of both. A modified file can also be pulled the
+other way: **Also update the vault file** writes the same result back into the
+note through Obsidian, so a change made at the destination — a flipped
+frontmatter field, a corrected caption — stops coming back as a diff. Pressing Escape there returns to the list
 rather than closing the dialog. Each change can be unchecked to
 keep the destination version of that file, and the remaining changes are still
 applied in a single atomic replacement. Images are compared side by side with
