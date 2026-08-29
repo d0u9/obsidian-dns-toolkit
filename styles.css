@@ -292,7 +292,8 @@
 /* One source of truth for caption type, so the boxed caption, the segmented
    caption, and any list inside either of them render in the same font. */
 .dns-custom-container[data-type='imgcap'],
-.markdown-rendered .dns-imgcap-segment {
+.markdown-rendered .dns-imgcap-segment,
+.cm-line.dns-cm-block--imgcap {
 	--dns-imgcap-color: #8a8a86;
 	--dns-imgcap-font-family: var(--font-text, inherit);
 	--dns-imgcap-font-size: .68rem;
@@ -1005,10 +1006,18 @@
 	font-size: .94em;
 }
 
-.cm-line.dns-cm-block--imgcap,
 .cm-line.dns-cm-block--compnote {
 	color: var(--text-muted);
 	font-size: .9em;
+}
+
+/* Captions read as an afterthought next to the image, in the editor too. */
+.cm-line.dns-cm-block--imgcap {
+	color: var(--dns-imgcap-color);
+	font-family: var(--dns-imgcap-font-family);
+	font-size: .78em;
+	font-weight: var(--dns-imgcap-font-weight);
+	line-height: var(--dns-imgcap-line-height);
 }
 
 .cm-line.dns-cm-block--center {
