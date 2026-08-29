@@ -60,6 +60,16 @@ export class ConfirmPublishingModal extends Modal {
 	) {
 		super(app);
 		this.modalEl.addClass('dns-publishing-modal');
+		// Registered after the modal's own handler, so this one runs first and
+		// keeps Escape inside the dialog while a file diff is open.
+		this.scope.register([], 'Escape', () => {
+			if (this.contentEl.hasClass('dns-publishing-content--diff')) {
+				this.renderSummary();
+				return false;
+			}
+			this.close();
+			return false;
+		});
 	}
 
 	onOpen(): void {
@@ -214,6 +224,38 @@ export class ConfirmPublishingModal extends Modal {
 		else this.keptPaths.delete(path);
 	}
 
+	// The two buttons sit above the two columns: picking one decides which
+	// version of this file the publish keeps.
+	private renderSideChooser(change: FolderChange): void {
+		const chooser = this.contentEl.createDiv({ cls: 'dns-publishing-choice' });
+		const options = SIDE_CHOICES[change.status];
+		const buttons = ([
+			['destination', options.destination],
+			['source', options.source],
+		] as const).map(([side, option]) => {
+			const button = chooser.createEl('button', { cls: `dns-publishing-choice__side is-${side}` });
+			button.createDiv({ cls: 'dns-publishing-choice__title', text: option.title });
+			button.createDiv({ cls: 'dns-publishing-choice__desc', text: option.description });
+			return { side, button };
+		});
+
+		const refresh = (): void => {
+			const kept = this.keptPaths.has(change.path);
+			for (const { side, button } of buttons) {
+				const selected = kept === (side === 'destination');
+				button.toggleClass('is-selected', selected);
+				button.setAttribute('aria-pressed', String(selected));
+			}
+		};
+		for (const { side, button } of buttons) {
+			button.onClickEvent(() => {
+				this.setKept(change.path, side === 'destination');
+				refresh();
+			});
+		}
+		refresh();
+	}
+
 	private renderImageDiff(
 		body: HTMLElement,
 		before: ImageFile | null,
@@ -271,19 +313,9 @@ export class ConfirmPublishingModal extends Modal {
 		this.contentEl.empty();
 		this.contentEl.removeClass('dns-publishing-content--summary');
 		this.contentEl.addClass('dns-publishing-content--diff');
-		this.contentEl.createDiv({
-			cls: 'dns-publishing-diff__legend',
-			text: `${CHANGE_LABELS[change.status]} — the current destination on the left, what will be published on the right.`,
-		});
+		this.renderSideChooser(change);
 		const body = this.contentEl.createDiv({ cls: 'dns-publishing-diff' });
 		body.createDiv({ cls: 'dns-publishing-diff__note', text: 'Loading…' });
-
-		new Setting(this.contentEl)
-			.setName('Apply this change')
-			.setDesc(APPLY_DESCRIPTIONS[change.status])
-			.addToggle((toggle) => toggle
-				.setValue(!this.keptPaths.has(change.path))
-				.onChange((value) => this.setKept(change.path, !value)));
 
 		new Setting(this.contentEl)
 			.addButton((button) => button
@@ -330,10 +362,24 @@ export class ConfirmPublishingModal extends Modal {
 	}
 }
 
-const APPLY_DESCRIPTIONS: Record<FolderChange['status'], string> = {
-	added: 'Turn off to leave this file out of the published folder.',
-	modified: 'Turn off to keep the current destination version.',
-	removed: 'Turn off to keep this file at the destination.',
+interface SideChoice {
+	title: string;
+	description: string;
+}
+
+const SIDE_CHOICES: Record<FolderChange['status'], { destination: SideChoice; source: SideChoice }> = {
+	added: {
+		destination: { title: 'Keep the destination', description: 'Not present there — leave the file out.' },
+		source: { title: 'Publish this file', description: 'Add it to the destination.' },
+	},
+	modified: {
+		destination: { title: 'Keep the destination version', description: 'Leave the published file untouched.' },
+		source: { title: 'Publish this version', description: 'Replace the file at the destination.' },
+	},
+	removed: {
+		destination: { title: 'Keep the destination file', description: 'It is gone from the vault, but stays published.' },
+		source: { title: 'Delete from the destination', description: 'Remove the published file too.' },
+	},
 };
 
 const NON_TEXT_NOTES: Record<'binary' | 'too-large' | 'identical', string> = {
