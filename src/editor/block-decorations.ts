@@ -7,6 +7,7 @@ import {
 	type PluginValue,
 	type ViewUpdate,
 } from '@codemirror/view';
+import { editorLivePreviewField } from 'obsidian';
 import type DnsToolkitPlugin from '../main';
 
 const OPENING = /^(:{3,})\s*(?:([a-zA-Z][a-zA-Z0-9_-]*)(?:\{[^}]*\})?(?:\s+.+)?)?\s*$/;
@@ -39,8 +40,11 @@ export function colonBlockEditorExtension(plugin: DnsToolkitPlugin): Extension {
 			}
 
 			update(update: ViewUpdate): void {
-				// Block structure only depends on the text, not on the cursor.
-				if (!update.docChanged) return;
+				// Block structure only depends on the text and on whether the
+				// view is showing raw Markdown.
+				const modeChanged = update.startState.field(editorLivePreviewField, false)
+					!== update.state.field(editorLivePreviewField, false);
+				if (!update.docChanged && !modeChanged) return;
 				this.decorations = buildDecorations(update.view, plugin);
 			}
 		},
@@ -50,6 +54,8 @@ export function colonBlockEditorExtension(plugin: DnsToolkitPlugin): Extension {
 
 function buildDecorations(view: EditorView, plugin: DnsToolkitPlugin): DecorationSet {
 	const builder = new RangeSetBuilder<Decoration>();
+	// Source mode asks for the raw text, so it gets it unshaped.
+	if (!view.state.field(editorLivePreviewField, false)) return builder.finish();
 	if (!plugin.settings.enableCustomContainers || !plugin.settings.enableEditorColonBlocks) {
 		return builder.finish();
 	}

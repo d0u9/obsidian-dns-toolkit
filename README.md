@@ -36,8 +36,9 @@ An inner block.
 ::::
 ```
 
-Typing an opening delimiter suggests the supported types, and the editor styles
-the lines a block spans so its shape is visible while writing. An opening
+Typing an opening delimiter suggests the supported types, and Live Preview
+styles the lines a block spans so its shape is visible while writing. Source
+mode is left as raw text. An opening
 delimiter that is never closed is marked in both views.
 
 Blank lines after the opening delimiter and before the closing delimiter are
