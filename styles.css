@@ -577,9 +577,9 @@
 
 .dns-publishing-change {
 	display: flex;
-	align-items: baseline;
-	gap: .5rem;
-	padding: .35rem .6rem;
+	align-items: center;
+	gap: .6rem;
+	padding: 0 .6rem;
 }
 
 .dns-publishing-change:not(:last-child) {
@@ -590,24 +590,38 @@
 	background: var(--background-modifier-hover);
 }
 
-.dns-publishing-change input[type='checkbox'] {
+.dns-publishing-modal .dns-publishing-change input[type='checkbox'] {
 	flex: none;
+	margin: 0;
 }
 
-.dns-publishing-change__open {
+/* Themes style buttons through descendant selectors, so the reset has to be
+   at least as specific to keep list rows flat. */
+.dns-publishing-modal .dns-publishing-change__open {
 	display: grid;
-	grid-template-columns: 5.5rem 1fr;
-	align-items: baseline;
+	grid-template-columns: 5rem 1fr;
+	align-items: center;
 	gap: .6rem;
 	flex: 1;
 	min-width: 0;
-	padding: 0;
+	height: auto;
+	min-height: 0;
+	margin: 0;
+	padding: .4rem 0;
 	border: 0;
 	border-radius: 0;
 	background: transparent;
 	box-shadow: none;
+	color: var(--text-normal);
+	font-size: var(--font-ui-smaller);
+	line-height: 1.4;
 	text-align: left;
 	cursor: pointer;
+}
+
+.dns-publishing-modal .dns-publishing-change__open:hover {
+	background: transparent;
+	box-shadow: none;
 }
 
 .dns-publishing-changes__header {
@@ -631,7 +645,6 @@
 
 .dns-publishing-change__path {
 	font-family: var(--font-monospace);
-	font-size: var(--font-ui-smaller);
 	overflow-wrap: anywhere;
 }
 
@@ -677,11 +690,75 @@
 
 .dns-publishing-diff__sign {
 	color: var(--text-muted);
+	text-align: center;
 	user-select: none;
+}
+
+.dns-publishing-diff__text {
+	padding-right: .6rem;
+	padding-left: .25rem;
 }
 
 .dns-publishing-diff__gap {
 	grid-column: 1 / -1;
 	padding: .1rem .6rem;
 	color: var(--text-muted);
+}
+
+.dns-publishing-diff--image {
+	padding: .8rem;
+	background: var(--background-primary);
+}
+
+.dns-publishing-image {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: .8rem;
+}
+
+.dns-publishing-image__pane {
+	display: grid;
+	gap: .4rem;
+	align-content: start;
+	justify-items: center;
+	padding: .6rem;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+}
+
+.dns-publishing-image__label {
+	justify-self: start;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.dns-publishing-image__preview {
+	max-width: 100%;
+	max-height: 18rem;
+	object-fit: contain;
+	border-radius: var(--radius-s);
+}
+
+.dns-publishing-image__meta,
+.dns-publishing-image__missing {
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+}
+
+.dns-publishing-image__missing {
+	padding: 2rem 0;
+}
+
+.dns-publishing-image__delta {
+	margin-top: .6rem;
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+	text-align: center;
+}
+
+@media (max-width: 620px) {
+	.dns-publishing-image { grid-template-columns: 1fr; }
 }

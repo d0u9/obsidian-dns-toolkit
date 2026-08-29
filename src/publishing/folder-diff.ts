@@ -16,9 +16,16 @@ export interface FolderComparison {
 
 export type FileDiff =
 	| { kind: 'text'; lines: DiffLine[] }
+	| { kind: 'image'; before: ImageFile | null; after: ImageFile | null }
 	| { kind: 'binary' }
 	| { kind: 'too-large' }
 	| { kind: 'identical' };
+
+export interface ImageFile {
+	bytes: Uint8Array<ArrayBuffer>;
+	byteLength: number;
+	mime: string;
+}
 
 export interface DiffLine {
 	kind: 'context' | 'add' | 'remove' | 'gap';
@@ -32,6 +39,18 @@ export interface DiffLine {
 const MAX_COMPARED_FILES = 5000;
 const MAX_COMPARED_BYTES = 32 * 1024 * 1024;
 const MAX_DIFFED_BYTES = 2 * 1024 * 1024;
+const MAX_PREVIEWED_IMAGE_BYTES = 24 * 1024 * 1024;
+
+const IMAGE_MIME_TYPES: Record<string, string> = {
+	avif: 'image/avif',
+	bmp: 'image/bmp',
+	gif: 'image/gif',
+	jpeg: 'image/jpeg',
+	jpg: 'image/jpeg',
+	png: 'image/png',
+	svg: 'image/svg+xml',
+	webp: 'image/webp',
+};
 const MAX_DIFF_MATRIX_CELLS = 4_000_000;
 const DIFF_CONTEXT_LINES = 3;
 
@@ -81,6 +100,9 @@ export async function readFileDiff(
 	targetFile: string | null,
 	fileSystem: FileSystem,
 ): Promise<FileDiff> {
+	const mime = imageMimeType(sourceFile ?? targetFile ?? '');
+	if (mime) return readImageDiff(sourceFile, targetFile, mime, fileSystem);
+
 	const before = targetFile ? await readTextFile(targetFile, fileSystem) : { kind: 'text' as const, text: '' };
 	if (before.kind !== 'text') return before;
 	const after = sourceFile ? await readTextFile(sourceFile, fileSystem) : { kind: 'text' as const, text: '' };
@@ -90,6 +112,36 @@ export async function readFileDiff(
 	const beforeLines = splitLines(before.text);
 	const afterLines = splitLines(after.text);
 	return { kind: 'text', lines: buildHunks(beforeLines, afterLines) };
+}
+
+function imageMimeType(path: string): string | null {
+	const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase();
+	return IMAGE_MIME_TYPES[extension] ?? null;
+}
+
+async function readImageDiff(
+	sourceFile: string | null,
+	targetFile: string | null,
+	mime: string,
+	fileSystem: FileSystem,
+): Promise<FileDiff> {
+	const before = targetFile ? await readImageFile(targetFile, mime, fileSystem) : null;
+	const after = sourceFile ? await readImageFile(sourceFile, mime, fileSystem) : null;
+	if (before === 'too-large' || after === 'too-large') return { kind: 'too-large' };
+	return { kind: 'image', before, after };
+}
+
+async function readImageFile(
+	path: string,
+	mime: string,
+	fileSystem: FileSystem,
+): Promise<ImageFile | 'too-large'> {
+	const buffer = await fileSystem.readFile(path);
+	if (buffer.byteLength > MAX_PREVIEWED_IMAGE_BYTES) return 'too-large';
+	// Copy out of Node's shared pool: the Blob below must own a plain ArrayBuffer.
+	const bytes = new Uint8Array(buffer.byteLength);
+	bytes.set(buffer);
+	return { bytes, byteLength: bytes.byteLength, mime };
 }
 
 async function listFiles(

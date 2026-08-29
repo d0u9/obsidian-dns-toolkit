@@ -1,6 +1,6 @@
 import { FuzzySuggestModal, Modal, Setting } from 'obsidian';
 import type { PublishingTargetKind } from './folder-publisher';
-import type { FileDiff, FolderChange, FolderComparison } from './folder-diff';
+import type { FileDiff, FolderChange, FolderComparison, ImageFile } from './folder-diff';
 
 export class PublishingFolderSuggestModal extends FuzzySuggestModal<string> {
 	constructor(
@@ -52,6 +52,7 @@ export class ConfirmPublishingModal extends Modal {
 	private comparison: FolderComparison | null = null;
 	// Paths the user unchecked: the destination version of each is kept.
 	private readonly keptPaths = new Set<string>();
+	private objectUrls: string[] = [];
 
 	constructor(
 		app: ConstructorParameters<typeof Modal>[0],
@@ -67,7 +68,13 @@ export class ConfirmPublishingModal extends Modal {
 	}
 
 	onClose(): void {
+		this.releaseObjectUrls();
 		this.contentEl.empty();
+	}
+
+	private releaseObjectUrls(): void {
+		for (const url of this.objectUrls) URL.revokeObjectURL(url);
+		this.objectUrls = [];
 	}
 
 	private async runComparison(): Promise<void> {
@@ -83,6 +90,7 @@ export class ConfirmPublishingModal extends Modal {
 	}
 
 	private renderSummary(comparisonError?: string): void {
+		this.releaseObjectUrls();
 		this.setTitle(`Publish “${this.options.folder}”?`);
 		this.contentEl.empty();
 		this.contentEl.removeClass('dns-publishing-content--diff');
@@ -206,14 +214,66 @@ export class ConfirmPublishingModal extends Modal {
 		else this.keptPaths.delete(path);
 	}
 
+	private renderImageDiff(
+		body: HTMLElement,
+		before: ImageFile | null,
+		after: ImageFile | null,
+	): void {
+		const panes = body.createDiv({ cls: 'dns-publishing-image' });
+		const beforePane = this.renderImagePane(panes, 'Current destination', before);
+		const afterPane = this.renderImagePane(panes, 'To be published', after);
+		if (!before || !after) return;
+
+		const delta = body.createDiv({ cls: 'dns-publishing-image__delta' });
+		const difference = after.byteLength - before.byteLength;
+		delta.setText(difference === 0
+			? 'Same file size, different contents.'
+			: `${difference > 0 ? '+' : '−'}${formatBytes(Math.abs(difference))} (${formatBytes(before.byteLength)} → ${formatBytes(after.byteLength)})`);
+		// Both sizes are known only once the browser has decoded each image.
+		void Promise.all([beforePane, afterPane]).then(([first, second]) => {
+			if (!first || !second || !delta.isConnected) return;
+			delta.setText(`${delta.getText()} · ${first.width}×${first.height} → ${second.width}×${second.height}`);
+		});
+	}
+
+	private renderImagePane(
+		parent: HTMLElement,
+		label: string,
+		image: ImageFile | null,
+	): Promise<{ width: number; height: number } | null> {
+		const pane = parent.createDiv({ cls: 'dns-publishing-image__pane' });
+		pane.createDiv({ cls: 'dns-publishing-image__label', text: label });
+		if (!image) {
+			pane.createDiv({ cls: 'dns-publishing-image__missing', text: 'Not present' });
+			return Promise.resolve(null);
+		}
+
+		const url = URL.createObjectURL(new Blob([image.bytes], { type: image.mime }));
+		this.objectUrls.push(url);
+		const element = pane.createEl('img', { cls: 'dns-publishing-image__preview' });
+		element.src = url;
+		const meta = pane.createDiv({ cls: 'dns-publishing-image__meta', text: formatBytes(image.byteLength) });
+		return new Promise((resolve) => {
+			element.addEventListener('load', () => {
+				meta.setText(`${element.naturalWidth}×${element.naturalHeight} · ${formatBytes(image.byteLength)}`);
+				resolve({ width: element.naturalWidth, height: element.naturalHeight });
+			});
+			element.addEventListener('error', () => {
+				meta.setText(`${formatBytes(image.byteLength)} · preview unavailable`);
+				resolve(null);
+			});
+		});
+	}
+
 	private async renderDiff(change: FolderChange): Promise<void> {
+		this.releaseObjectUrls();
 		this.setTitle(change.path);
 		this.contentEl.empty();
 		this.contentEl.removeClass('dns-publishing-content--summary');
 		this.contentEl.addClass('dns-publishing-content--diff');
 		this.contentEl.createDiv({
 			cls: 'dns-publishing-diff__legend',
-			text: `${CHANGE_LABELS[change.status]} — red is the current destination, green is what will be published.`,
+			text: `${CHANGE_LABELS[change.status]} — the current destination on the left or in red, what will be published on the right or in green.`,
 		});
 		const body = this.contentEl.createDiv({ cls: 'dns-publishing-diff' });
 		body.createDiv({ cls: 'dns-publishing-diff__note', text: 'Loading…' });
@@ -245,6 +305,11 @@ export class ConfirmPublishingModal extends Modal {
 		if (!this.contentEl.hasClass('dns-publishing-content--diff')) return;
 
 		body.empty();
+		if (diff.kind === 'image') {
+			body.addClass('dns-publishing-diff--image');
+			this.renderImageDiff(body, diff.before, diff.after);
+			return;
+		}
 		if (diff.kind !== 'text') {
 			body.createDiv({ cls: 'dns-publishing-diff__note', text: NON_TEXT_NOTES[diff.kind] });
 			return;
@@ -283,6 +348,18 @@ const NON_TEXT_NOTES: Record<'binary' | 'too-large' | 'identical', string> = {
 	'too-large': 'This file is too large to diff.',
 	identical: 'The file contents are identical.',
 };
+
+function formatBytes(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`;
+	const units = ['KB', 'MB', 'GB'];
+	let value = bytes / 1024;
+	let unit = 0;
+	while (value >= 1024 && unit < units.length - 1) {
+		value /= 1024;
+		unit += 1;
+	}
+	return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+}
 
 function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
