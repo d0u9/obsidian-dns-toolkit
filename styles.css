@@ -548,8 +548,9 @@
 }
 
 .dns-publishing-modal {
-	width: min(76rem, 94vw);
-	max-height: 88vh;
+	width: min(96rem, 96vw);
+	max-width: 96vw;
+	max-height: 94vh;
 }
 
 .dns-publishing-changes {
@@ -570,7 +571,7 @@
 
 .dns-publishing-changes__list {
 	display: grid;
-	max-height: min(24rem, 40vh);
+	max-height: min(30rem, 46vh);
 	overflow-y: auto;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m);
@@ -699,7 +700,7 @@
 }
 
 .dns-publishing-diff {
-	max-height: min(30rem, 52vh);
+	max-height: min(44rem, 62vh);
 	overflow: auto;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m);
@@ -846,7 +847,7 @@
 
 .dns-publishing-image__preview {
 	max-width: 100%;
-	max-height: 18rem;
+	max-height: 24rem;
 	object-fit: contain;
 	border-radius: var(--radius-s);
 }

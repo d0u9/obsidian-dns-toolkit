@@ -52,6 +52,11 @@ export interface ConfirmPublishingOptions {
 	target: string;
 	targetKind: PublishingTargetKind;
 	compare: () => Promise<FolderComparison>;
+	resolvePaths: (change: FolderChange) => {
+		source: string | null;
+		destination: string | null;
+		plannedDestination: string;
+	};
 	loadDiff: (change: FolderChange) => Promise<FileDiff>;
 	onConfirm: (decisions: PublishDecision[]) => void;
 }
@@ -294,6 +299,17 @@ export class ConfirmPublishingModal extends Modal {
 		else this.keptPaths.delete(path);
 	}
 
+	private renderDiffPaths(change: FolderChange): void {
+		const paths = this.options.resolvePaths(change);
+		const block = this.contentEl.createDiv({ cls: 'dns-publishing-preview' });
+		block.createDiv({
+			text: paths.destination
+				? `Destination: ${paths.destination}`
+				: `Destination: ${paths.plannedDestination} (not there yet)`,
+		});
+		if (paths.source) block.createDiv({ text: `Source: ${paths.source}` });
+	}
+
 	// The two buttons sit above the two columns: picking one decides which
 	// version of this file the publish keeps.
 	private renderSideChooser(change: FolderChange, onPick: () => void): () => void {
@@ -385,6 +401,7 @@ export class ConfirmPublishingModal extends Modal {
 		this.contentEl.empty();
 		this.contentEl.removeClass('dns-publishing-content--summary');
 		this.contentEl.addClass('dns-publishing-content--diff');
+		this.renderDiffPaths(change);
 		let repaint = (): void => {};
 		const refreshChooser = this.renderSideChooser(change, () => repaint());
 		const body = this.contentEl.createDiv({ cls: 'dns-publishing-diff' });

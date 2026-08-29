@@ -107,6 +107,11 @@ async function openConfirmation(
 		target,
 		targetKind,
 		compare: () => compareFolders(source, target, fileSystem, pathModule),
+		resolvePaths: (change) => ({
+			source: change.status === 'removed' ? null : pathModule.join(source, change.path),
+			destination: change.status === 'added' ? null : pathModule.join(target, change.path),
+			plannedDestination: pathModule.join(target, change.path),
+		}),
 		loadDiff: (change) => readFileDiff(
 			change.status === 'removed' ? null : pathModule.join(source, change.path),
 			change.status === 'added' ? null : pathModule.join(target, change.path),
