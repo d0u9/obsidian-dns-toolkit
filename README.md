@@ -119,7 +119,11 @@ keep the destination version of that file, and the remaining changes are still
 applied in a single atomic replacement. Images are compared side by side with
 their dimensions and file size instead of as text. Symbolic links are rejected. This feature reads only the
 configured source folder and writes only to the external destination selected
-by the user; it makes no network requests.
+by the user; it makes no network requests. The destination sits outside the
+vault, so it is reached through Node's file system API rather than the vault
+API, guarded by a desktop check and by validation that the source stays inside
+the vault and the destination stays outside it. Pulling a change back the other
+way goes through the vault API instead, so Obsidian sees it.
 
 ## Development
 

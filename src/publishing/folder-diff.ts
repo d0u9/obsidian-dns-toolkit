@@ -1,5 +1,7 @@
-type FileSystem = typeof import('node:fs/promises');
-type PathModule = typeof import('node:path');
+import type { FileSystemApi, PathApi } from './node-api';
+
+type FileSystem = FileSystemApi;
+type PathModule = PathApi;
 
 export type ChangeStatus = 'added' | 'modified' | 'removed';
 
@@ -164,9 +166,10 @@ async function readImageFile(
 ): Promise<ImageFile | 'too-large'> {
 	const buffer = await fileSystem.readFile(path);
 	if (buffer.byteLength > MAX_PREVIEWED_IMAGE_BYTES) return 'too-large';
-	// Copy out of Node's shared pool: the Blob below must own a plain ArrayBuffer.
-	const bytes = new Uint8Array(buffer.byteLength);
-	bytes.set(buffer);
+	// Copy out of Node's shared pool: the Blob built from this must own a plain
+	// ArrayBuffer of its own.
+	const bytes = new Uint8Array(new ArrayBuffer(buffer.byteLength));
+	bytes.set(buffer.slice());
 	return { bytes, byteLength: bytes.byteLength, mime };
 }
 

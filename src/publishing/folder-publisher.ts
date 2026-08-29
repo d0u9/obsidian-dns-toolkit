@@ -1,6 +1,7 @@
 import { FileSystemAdapter, Notice, Platform, TFile, normalizePath } from 'obsidian';
 import type DnsToolkitPlugin from '../main';
 import { compareFolders, readFileDiff, type ChangeStatus } from './folder-diff';
+import { loadDesktopNodeModules, type FileSystemApi, type PathApi } from './node-api';
 import { ConfirmPublishingModal, PublishingFolderSuggestModal } from './modals';
 
 export type PublishingTargetKind = 'missing' | 'folder' | 'file' | 'symlink';
@@ -211,8 +212,8 @@ async function pullIntoVault(
 	vaultFolder: string,
 	target: string,
 	pulls: VaultPull[],
-	fileSystem: typeof import('node:fs/promises'),
-	pathModule: typeof import('node:path'),
+	fileSystem: FileSystemApi,
+	pathModule: PathApi,
 ): Promise<void> {
 	if (pulls.length === 0) return;
 	let updated = 0;
@@ -230,7 +231,7 @@ async function pullIntoVault(
 			} else {
 				const bytes = await fileSystem.readFile(pathModule.join(target, pull.path));
 				const buffer = new ArrayBuffer(bytes.byteLength);
-				new Uint8Array(buffer).set(bytes);
+				new Uint8Array(buffer).set(bytes.slice());
 				await plugin.app.vault.modifyBinary(file, buffer);
 			}
 			updated += 1;
@@ -254,8 +255,8 @@ async function applyDecisions(
 	staging: string,
 	target: string,
 	decisions: PublishDecision[],
-	fileSystem: typeof import('node:fs/promises'),
-	pathModule: typeof import('node:path'),
+	fileSystem: FileSystemApi,
+	pathModule: PathApi,
 ): Promise<void> {
 	for (const change of decisions) {
 		const stagedPath = pathModule.join(staging, change.path);
@@ -281,8 +282,8 @@ async function applyDecisions(
 async function removeEmptyParents(
 	path: string,
 	root: string,
-	fileSystem: typeof import('node:fs/promises'),
-	pathModule: typeof import('node:path'),
+	fileSystem: FileSystemApi,
+	pathModule: PathApi,
 ): Promise<void> {
 	let directory = pathModule.dirname(path);
 	while (directory !== root && isInside(root, directory, pathModule)) {
@@ -301,8 +302,8 @@ async function removeEmptyParents(
 async function removeStaleWorkFolders(
 	parent: string,
 	basename: string,
-	fileSystem: typeof import('node:fs/promises'),
-	pathModule: typeof import('node:path'),
+	fileSystem: FileSystemApi,
+	pathModule: PathApi,
 ): Promise<void> {
 	const prefixes = [`.${basename}.dns-copy-`, `.${basename}.dns-backup-`];
 	let entries;
@@ -328,8 +329,8 @@ async function removeStaleWorkFolders(
 
 async function assertNoSymbolicLinks(
 	root: string,
-	fileSystem: typeof import('node:fs/promises'),
-	pathModule: typeof import('node:path'),
+	fileSystem: FileSystemApi,
+	pathModule: PathApi,
 ): Promise<void> {
 	const entries = await fileSystem.readdir(root, { withFileTypes: true });
 	for (const entry of entries) {
@@ -345,26 +346,14 @@ function normalizeVaultFolder(value: string): string {
 	return normalizePath(value.trim()).replace(/^\/+|\/+$/g, '');
 }
 
-function loadDesktopNodeModules(): {
-	fileSystem: typeof import('node:fs/promises');
-	pathModule: typeof import('node:path');
-} {
-	return {
-		// eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef -- Loaded only after the desktop guard.
-		fileSystem: require('node:fs/promises') as typeof import('node:fs/promises'),
-		// eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef -- Loaded only after the desktop guard.
-		pathModule: require('node:path') as typeof import('node:path'),
-	};
-}
-
-function isInside(parent: string, child: string, pathModule: typeof import('node:path')): boolean {
+function isInside(parent: string, child: string, pathModule: PathApi): boolean {
 	const result = pathModule.relative(parent, child);
 	return result === '' || (!result.startsWith('..') && !pathModule.isAbsolute(result));
 }
 
 async function isMissingFolder(
 	path: string,
-	fileSystem: typeof import('node:fs/promises'),
+	fileSystem: FileSystemApi,
 ): Promise<boolean> {
 	try {
 		return !(await fileSystem.stat(path)).isDirectory();

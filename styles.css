@@ -986,11 +986,13 @@
 	font-size: var(--font-ui-smaller);
 }
 
-/* An opening delimiter with no closing fence stays visible and says why. */
+/* An opening delimiter with no closing fence stays visible and says why. A
+   border rather than a decorated underline: the shorthand is only partly
+   supported by the older app versions the plugin still targets. */
 .dns-unclosed-delimiter {
+	display: inline-block;
+	border-bottom: 1px dotted var(--color-red);
 	color: var(--text-muted);
-	text-decoration: underline dotted var(--color-red);
-	text-underline-offset: .2em;
 	cursor: help;
 }
 
@@ -1003,9 +1005,8 @@
 }
 
 .cm-line.dns-cm-unclosed {
+	border-bottom: 1px dotted var(--color-red);
 	color: var(--color-red);
-	text-decoration: underline dotted var(--color-red);
-	text-underline-offset: .2em;
 }
 
 .cm-line.dns-cm-block--lead {
@@ -1060,12 +1061,6 @@
 .markdown-source-view.mod-cm6 .cm-line.dns-cm-block--imgcap :is(span, div, .list-bullet, .list-number) {
 	font-size: inherit;
 	line-height: inherit;
-}
-
-/* Live Preview writes the list indent as an inline style, which nothing but
-   an important declaration can narrow. */
-.markdown-source-view.mod-cm6 .cm-line.dns-cm-block--imgcap.HyperMD-list-line {
-	padding-inline-start: var(--dns-imgcap-list-indent) !important;
 }
 
 /* The opening delimiter is the caption's first line, so it sits close to the
