@@ -1,6 +1,6 @@
 import { FileSystemAdapter, Notice, Platform, normalizePath } from 'obsidian';
 import type DnsToolkitPlugin from '../main';
-import { compareFolders, readFileDiff } from './folder-diff';
+import { compareFolders, readFileDiff, type FolderChange } from './folder-diff';
 import { ConfirmPublishingModal, PublishingFolderSuggestModal } from './modals';
 
 export type PublishingTargetKind = 'missing' | 'folder' | 'file' | 'symlink';
@@ -106,11 +106,16 @@ async function openConfirmation(
 			change.status === 'added' ? null : pathModule.join(target, change.path),
 			fileSystem,
 		),
-		onConfirm: () => void publishFolder(source, target, folder),
+		onConfirm: (keptChanges) => void publishFolder(source, target, folder, keptChanges),
 	}).open();
 }
 
-async function publishFolder(source: string, target: string, folder: string): Promise<void> {
+async function publishFolder(
+	source: string,
+	target: string,
+	folder: string,
+	keptChanges: FolderChange[],
+): Promise<void> {
 	const { fileSystem, pathModule } = loadDesktopNodeModules();
 	const parent = pathModule.dirname(target);
 	const suffix = `${Date.now()}-${crypto.randomUUID()}`;
@@ -127,6 +132,9 @@ async function publishFolder(source: string, target: string, folder: string): Pr
 		await assertNoSymbolicLinks(source, fileSystem, pathModule);
 		await fileSystem.mkdir(parent, { recursive: true });
 		await fileSystem.cp(source, staging, { recursive: true, force: false, errorOnExist: true });
+		// The destination is still in place here, so the files the user chose to
+		// keep are backfilled into the staging copy before anything is moved.
+		await keepDestinationFiles(staging, target, keptChanges, fileSystem, pathModule);
 		try {
 			await fileSystem.rename(target, backup);
 			movedExistingTarget = true;
@@ -137,7 +145,9 @@ async function publishFolder(source: string, target: string, folder: string): Pr
 		if (movedExistingTarget) {
 			void fileSystem.rm(backup, { recursive: true, force: true }).catch(() => undefined);
 		}
-		new Notice(`Published “${folder}” successfully.`);
+		new Notice(keptChanges.length === 0
+			? `Published “${folder}” successfully.`
+			: `Published “${folder}” successfully, keeping ${keptChanges.length} destination ${keptChanges.length === 1 ? 'file' : 'files'}.`);
 	} catch (error) {
 		await fileSystem.rm(staging, { recursive: true, force: true }).catch(() => undefined);
 		if (movedExistingTarget) {
@@ -146,6 +156,49 @@ async function publishFolder(source: string, target: string, folder: string): Pr
 		new Notice(`Could not publish “${folder}”: ${errorMessage(error)}`);
 	} finally {
 		publishInProgress = false;
+	}
+}
+
+// Applies the user's per-file choices to the staging copy: a skipped addition
+// is dropped, and a skipped modification or deletion is restored from the
+// destination as it stands right now.
+async function keepDestinationFiles(
+	staging: string,
+	target: string,
+	keptChanges: FolderChange[],
+	fileSystem: typeof import('node:fs/promises'),
+	pathModule: typeof import('node:path'),
+): Promise<void> {
+	for (const change of keptChanges) {
+		const stagedPath = pathModule.join(staging, change.path);
+		if (change.status === 'added') {
+			await fileSystem.rm(stagedPath, { force: true });
+			await removeEmptyParents(stagedPath, staging, fileSystem, pathModule);
+			continue;
+		}
+		const destinationPath = pathModule.join(target, change.path);
+		if ((await fileSystem.lstat(destinationPath)).isSymbolicLink()) {
+			throw new Error(`Symbolic links are not supported (${change.path}).`);
+		}
+		await fileSystem.mkdir(pathModule.dirname(stagedPath), { recursive: true });
+		await fileSystem.cp(destinationPath, stagedPath, { force: true });
+	}
+}
+
+async function removeEmptyParents(
+	path: string,
+	root: string,
+	fileSystem: typeof import('node:fs/promises'),
+	pathModule: typeof import('node:path'),
+): Promise<void> {
+	let directory = pathModule.dirname(path);
+	while (directory !== root && isInside(root, directory, pathModule)) {
+		try {
+			await fileSystem.rmdir(directory);
+		} catch {
+			return;
+		}
+		directory = pathModule.dirname(directory);
 	}
 }
 

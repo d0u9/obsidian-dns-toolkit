@@ -45,11 +45,13 @@ export interface ConfirmPublishingOptions {
 	targetKind: PublishingTargetKind;
 	compare: () => Promise<FolderComparison>;
 	loadDiff: (change: FolderChange) => Promise<FileDiff>;
-	onConfirm: () => void;
+	onConfirm: (keptChanges: FolderChange[]) => void;
 }
 
 export class ConfirmPublishingModal extends Modal {
 	private comparison: FolderComparison | null = null;
+	// Paths the user unchecked: the destination version of each is kept.
+	private readonly keptPaths = new Set<string>();
 
 	constructor(
 		app: ConstructorParameters<typeof Modal>[0],
@@ -102,8 +104,12 @@ export class ConfirmPublishingModal extends Modal {
 				.setButtonText(this.options.targetKind === 'missing' ? 'Copy' : 'Replace')
 				.onClick(() => {
 					this.close();
-					this.options.onConfirm();
+					this.options.onConfirm(this.keptChanges());
 				}));
+	}
+
+	private keptChanges(): FolderChange[] {
+		return this.comparison?.changes.filter((change) => this.keptPaths.has(change.path)) ?? [];
 	}
 
 	private renderChanges(comparisonError?: string): void {
@@ -143,17 +149,48 @@ export class ConfirmPublishingModal extends Modal {
 			return;
 		}
 
+		const selectedCount = changes.length - this.keptPaths.size;
+		const header = section.createDiv({ cls: 'dns-publishing-changes__header' });
+		const selectAll = header.createEl('input', { type: 'checkbox' });
+		selectAll.checked = selectedCount > 0;
+		selectAll.indeterminate = selectedCount > 0 && selectedCount < changes.length;
+		selectAll.setAttribute('aria-label', 'Apply every change');
+		selectAll.addEventListener('change', () => {
+			if (selectAll.checked) this.keptPaths.clear();
+			else for (const change of changes) this.keptPaths.add(change.path);
+			this.renderSummary();
+		});
+		header.createSpan({
+			cls: 'dns-publishing-changes__count',
+			text: `${selectedCount} of ${changes.length} changes selected`,
+		});
+
 		const list = section.createDiv({ cls: 'dns-publishing-changes__list' });
 		for (const change of changes) {
-			const row = list.createEl('button', {
+			const row = list.createDiv({
 				cls: `dns-publishing-change dns-publishing-change--${change.status}`,
 			});
-			row.createSpan({
+			const checkbox = row.createEl('input', { type: 'checkbox' });
+			checkbox.checked = !this.keptPaths.has(change.path);
+			checkbox.setAttribute('aria-label', `Apply ${CHANGE_LABELS[change.status].toLowerCase()} ${change.path}`);
+			checkbox.addEventListener('change', () => {
+				this.setKept(change.path, !checkbox.checked);
+				this.renderSummary();
+			});
+			const open = row.createEl('button', { cls: 'dns-publishing-change__open' });
+			open.createSpan({
 				cls: 'dns-publishing-change__badge',
 				text: CHANGE_LABELS[change.status],
 			});
-			row.createSpan({ cls: 'dns-publishing-change__path', text: change.path });
-			row.onClickEvent(() => void this.renderDiff(change));
+			open.createSpan({ cls: 'dns-publishing-change__path', text: change.path });
+			open.onClickEvent(() => void this.renderDiff(change));
+		}
+
+		if (this.keptPaths.size > 0) {
+			section.createDiv({
+				cls: 'dns-publishing-changes__note',
+				text: `${this.keptPaths.size} unchecked ${this.keptPaths.size === 1 ? 'file keeps' : 'files keep'} the current destination version.`,
+			});
 		}
 
 		if (truncated) {
@@ -162,6 +199,11 @@ export class ConfirmPublishingModal extends Modal {
 				text: 'Only the first 5000 files were compared.',
 			});
 		}
+	}
+
+	private setKept(path: string, kept: boolean): void {
+		if (kept) this.keptPaths.add(path);
+		else this.keptPaths.delete(path);
 	}
 
 	private async renderDiff(change: FolderChange): Promise<void> {
@@ -175,6 +217,13 @@ export class ConfirmPublishingModal extends Modal {
 		});
 		const body = this.contentEl.createDiv({ cls: 'dns-publishing-diff' });
 		body.createDiv({ cls: 'dns-publishing-diff__note', text: 'Loading…' });
+
+		new Setting(this.contentEl)
+			.setName('Apply this change')
+			.setDesc(APPLY_DESCRIPTIONS[change.status])
+			.addToggle((toggle) => toggle
+				.setValue(!this.keptPaths.has(change.path))
+				.onChange((value) => this.setKept(change.path, !value)));
 
 		new Setting(this.contentEl)
 			.addButton((button) => button
@@ -222,6 +271,12 @@ export class ConfirmPublishingModal extends Modal {
 		}
 	}
 }
+
+const APPLY_DESCRIPTIONS: Record<FolderChange['status'], string> = {
+	added: 'Turn off to leave this file out of the published folder.',
+	modified: 'Turn off to keep the current destination version.',
+	removed: 'Turn off to keep this file at the destination.',
+};
 
 const NON_TEXT_NOTES: Record<'binary' | 'too-large' | 'identical', string> = {
 	binary: 'This is a binary file, so no line diff is shown.',

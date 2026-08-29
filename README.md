@@ -71,7 +71,9 @@ The selected top-level folder name is preserved. If the destination already
 exists, the command asks for confirmation and safely replaces it after the new
 copy has completed. The confirmation lists every file that will be added,
 modified, or removed; selecting one shows a line diff between the current
-destination and what is about to be published. Symbolic links are rejected. This feature reads only the
+destination and what is about to be published. Each change can be unchecked to
+keep the destination version of that file, and the remaining changes are still
+applied in a single atomic replacement. Symbolic links are rejected. This feature reads only the
 configured source folder and writes only to the external destination selected
 by the user; it makes no network requests.
 
