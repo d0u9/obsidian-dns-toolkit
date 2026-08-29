@@ -1,6 +1,13 @@
 import { Platform } from 'obsidian';
 
 /**
+ * Obsidian plugins run as CommonJS. The loader is typed here rather than taken
+ * from Node's type definitions, so the shape holds where those are absent and
+ * nothing reaches the rest of the plugin as `any`.
+ */
+declare const require: (moduleName: string) => unknown;
+
+/**
  * The slice of Node's file system and path modules this plugin uses, described
  * here rather than imported as types. Obsidian's scanner lints plugins without
  * Node's type definitions, where `typeof import('node:fs/promises')` degrades
@@ -73,9 +80,7 @@ export function loadDesktopNodeModules(): {
 		throw new Error('Folder publishing is available only in the desktop app.');
 	}
 	return {
-		// eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef -- Loaded only after the desktop guard.
 		fileSystem: require('node:fs/promises') as FileSystemApi,
-		// eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef -- Loaded only after the desktop guard.
 		pathModule: require('node:path') as PathApi,
 	};
 }
