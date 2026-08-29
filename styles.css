@@ -495,6 +495,24 @@
 	text-align: end;
 }
 
+.dns-publishing-path {
+	width: min(32rem, 55vw);
+}
+
+.dns-publishing-preview {
+	display: grid;
+	gap: .45rem;
+	margin: 1rem 0;
+	padding: .8rem;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+	overflow-wrap: anywhere;
+}
+
 .dns-colon-block-list {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -24,6 +24,9 @@ export interface DnsToolkitSettings {
 	editingWordSpacing: number;
 	editingLineHeight: number;
 	editingParagraphSpacing: number;
+	enableFolderPublishing: boolean;
+	publishingSourceFolder: string;
+	publishingTargetFolder: string;
 }
 
 export const DEFAULT_SETTINGS: DnsToolkitSettings = {
@@ -41,6 +44,9 @@ export const DEFAULT_SETTINGS: DnsToolkitSettings = {
 	editingWordSpacing: 0,
 	editingLineHeight: 1.6,
 	editingParagraphSpacing: 1,
+	enableFolderPublishing: false,
+	publishingSourceFolder: 'publish',
+	publishingTargetFolder: '',
 };
 
 const SUPPORTED_BLOCKS: readonly {
@@ -67,7 +73,7 @@ const SUPPORTED_BLOCKS: readonly {
 ];
 
 export class DnsToolkitSettingTab extends PluginSettingTab {
-	private activeSection: 'containers' | 'typography' = 'containers';
+	private activeSection: 'containers' | 'typography' | 'publishing' = 'containers';
 	private activeTypographyView: 'reading' | 'editing' = 'reading';
 
 	constructor(app: App, private readonly plugin: DnsToolkitPlugin) {
@@ -129,6 +135,48 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 					},
 				],
 			},
+			{
+				type: 'page',
+				name: 'Folder publishing',
+				desc: 'Copy one direct subfolder from the vault to a folder outside the vault. Desktop only.',
+				items: [
+					{
+						name: 'Enable',
+						desc: 'Enable the folder publishing command.',
+						control: {
+							type: 'toggle',
+							key: 'enableFolderPublishing',
+							defaultValue: DEFAULT_SETTINGS.enableFolderPublishing,
+						},
+					},
+					{
+						name: 'Source folder',
+						desc: 'Vault-relative folder whose direct subfolders can be published, for example publish.',
+						control: {
+							type: 'text',
+							key: 'publishingSourceFolder',
+							defaultValue: DEFAULT_SETTINGS.publishingSourceFolder,
+							placeholder: 'publish',
+							validate: (value) => value.trim() ? undefined : 'Enter a source folder.',
+						},
+					},
+					{
+						name: 'Final publishing folder',
+						desc: 'Absolute path outside this vault. The selected folder name is preserved.',
+						control: {
+							type: 'text',
+							key: 'publishingTargetFolder',
+							defaultValue: DEFAULT_SETTINGS.publishingTargetFolder,
+							placeholder: '/xxx/finalpublishing',
+							validate: (value) => value.trim() ? undefined : 'Enter a destination folder.',
+						},
+					},
+					{
+						name: 'Publish a folder',
+						desc: 'Run “Publish folder to final publishing folder”, choose a direct subfolder, then confirm the copy.',
+					},
+				],
+			},
 		];
 	}
 
@@ -137,12 +185,18 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 			case 'enableCustomContainers':
 			case 'enableTypography':
 			case 'enableEditingTypography':
+			case 'enableFolderPublishing':
 				if (typeof value !== 'boolean') return;
 				this.plugin.settings[key] = value;
 				break;
 			case 'defaultType':
 				if (typeof value !== 'string' || !value.trim()) return;
 				this.plugin.settings.defaultType = value.trim();
+				break;
+			case 'publishingSourceFolder':
+			case 'publishingTargetFolder':
+				if (typeof value !== 'string') return;
+				this.plugin.settings[key] = value.trim();
 				break;
 			case 'fontSize':
 			case 'letterSpacing':
@@ -220,6 +274,10 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 			this.renderTypographySettings();
 			return;
 		}
+		if (this.activeSection === 'publishing') {
+			this.renderPublishingSettings();
+			return;
+		}
 
 		this.renderContainerSettings();
 	}
@@ -231,6 +289,7 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 		for (const section of [
 			{ id: 'containers' as const, label: 'Colon blocks' },
 			{ id: 'typography' as const, label: 'Page typography' },
+			{ id: 'publishing' as const, label: 'Folder publishing' },
 		]) {
 			const button = navigation.createEl('button', {
 				cls: 'dns-settings-navigation__item',
@@ -246,6 +305,52 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 				this.renderActiveSection();
 			});
 		}
+	}
+
+	private renderPublishingSettings(): void {
+		new Setting(this.containerEl)
+			.setName('Folder publishing')
+			.setDesc('Copy one direct subfolder from the vault to a folder outside the vault. Desktop only.')
+			.setHeading();
+
+		new Setting(this.containerEl)
+			.setName('Enable')
+			.setDesc('Enable the folder publishing command.')
+			.addToggle((toggle) => toggle
+				.setValue(this.plugin.settings.enableFolderPublishing)
+				.onChange(async (value) => {
+					this.plugin.settings.enableFolderPublishing = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(this.containerEl)
+			.setName('Source folder')
+			.setDesc('Vault-relative folder whose direct subfolders can be published, for example publish.')
+			.addText((text) => text
+				.setPlaceholder('Publish')
+				.setValue(this.plugin.settings.publishingSourceFolder)
+				.onChange(async (value) => {
+					this.plugin.settings.publishingSourceFolder = value.trim();
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(this.containerEl)
+			.setName('Final publishing folder')
+			.setDesc('Absolute path outside this vault. The selected folder name is preserved.')
+			.addText((text) => {
+				text.inputEl.addClass('dns-publishing-path');
+				text
+					.setPlaceholder('/xxx/finalpublishing')
+					.setValue(this.plugin.settings.publishingTargetFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.publishingTargetFolder = value.trim();
+						await this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(this.containerEl)
+			.setName('Publish')
+			.setDesc('Choose a direct subfolder with the publishing command, then confirm. An existing folder with the same name is replaced safely.');
 	}
 
 	private renderContainerSettings(): void {
@@ -450,4 +555,5 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 }
 
 type TypographyNumberKey = Exclude<keyof DnsToolkitSettings,
-	'enableCustomContainers' | 'defaultType' | 'enableTypography' | 'enableEditingTypography'>;
+	'enableCustomContainers' | 'defaultType' | 'enableTypography' | 'enableEditingTypography'
+	| 'enableFolderPublishing' | 'publishingSourceFolder' | 'publishingTargetFolder'>;

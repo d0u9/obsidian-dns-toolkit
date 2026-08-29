@@ -59,6 +59,20 @@ Sample photograph from this site
 Containers are rendered in Reading view. Use the **Insert custom container**
 command to wrap selected text or insert a new container.
 
+## Folder publishing
+
+The optional desktop-only folder publishing feature copies one direct
+subfolder, such as `publish/02`, to a configured folder outside the vault.
+Configure and enable it under **Settings → DnS Toolkit → Folder publishing**,
+then run **Publish folder to final publishing folder**. The searchable picker
+is populated from the source folder each time the command runs.
+
+The selected top-level folder name is preserved. If the destination already
+exists, the command asks for confirmation and safely replaces it after the new
+copy has completed. Symbolic links are rejected. This feature reads only the
+configured source folder and writes only to the external destination selected
+by the user; it makes no network requests.
+
 ## Development
 
 Requires Node.js 18 or newer and npm.
