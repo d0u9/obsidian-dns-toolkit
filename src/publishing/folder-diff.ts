@@ -15,7 +15,7 @@ export interface FolderComparison {
 }
 
 export type FileDiff =
-	| { kind: 'text'; rows: DiffRow[] }
+	| { kind: 'text'; rows: DiffRow[]; hunkCount: number; trailingNewline: boolean }
 	| { kind: 'image'; before: ImageFile | null; after: ImageFile | null }
 	| { kind: 'binary' }
 	| { kind: 'too-large' }
@@ -32,6 +32,8 @@ interface DiffLine {
 	text: string;
 	beforeLine?: number;
 	afterLine?: number;
+	// Set on gap rows: the collapsed lines, needed to rebuild a merged file.
+	hidden?: string[];
 }
 
 export interface DiffCell {
@@ -46,6 +48,10 @@ export interface DiffRow {
 	before: DiffCell | null;
 	after: DiffCell | null;
 	text?: string;
+	// Index of the run of changed lines this row belongs to, so a single file
+	// can be published with some runs taken from either side.
+	hunk?: number;
+	hidden?: string[];
 }
 
 // Publishing folders hold prose, so these ceilings only guard against a stray
@@ -125,7 +131,13 @@ export async function readFileDiff(
 
 	const beforeLines = splitLines(before.text);
 	const afterLines = splitLines(after.text);
-	return { kind: 'text', rows: pairRows(buildHunks(beforeLines, afterLines)) };
+	const rows = pairRows(buildHunks(beforeLines, afterLines));
+	return {
+		kind: 'text',
+		rows,
+		hunkCount: rows.reduce((total, row) => Math.max(total, (row.hunk ?? -1) + 1), 0),
+		trailingNewline: after.text === '' || after.text.endsWith('\n'),
+	};
 }
 
 function imageMimeType(path: string): string | null {
@@ -244,7 +256,11 @@ function buildHunks(before: string[], after: string[]): DiffLine[] {
 		if (skipped.length === 0) return;
 		// Collapsing a single line would take more room than showing it.
 		if (skipped.length === 1) lines.push(...skipped);
-		else lines.push({ kind: 'gap', text: `${skipped.length} unchanged lines` });
+		else lines.push({
+			kind: 'gap',
+			text: `${skipped.length} unchanged lines`,
+			hidden: skipped.map((line) => line.text),
+		});
 		skipped = [];
 	};
 	rows.forEach((row, index) => {
@@ -264,10 +280,11 @@ function buildHunks(before: string[], after: string[]): DiffLine[] {
 function pairRows(lines: DiffLine[]): DiffRow[] {
 	const rows: DiffRow[] = [];
 	let index = 0;
+	let hunk = 0;
 	while (index < lines.length) {
 		const line = lines[index]!;
 		if (line.kind === 'gap') {
-			rows.push({ kind: 'gap', before: null, after: null, text: line.text });
+			rows.push({ kind: 'gap', before: null, after: null, text: line.text, hidden: line.hidden });
 			index += 1;
 			continue;
 		}
@@ -295,10 +312,36 @@ function pairRows(lines: DiffLine[]): DiffRow[] {
 				kind: 'change',
 				before: removed[offset] ?? null,
 				after: added[offset] ?? null,
+				hunk,
 			});
 		}
+		hunk += 1;
 	}
 	return rows;
+}
+
+// Rebuilds the file from the rows, taking the runs named in `destinationHunks`
+// from the destination and every other run from the vault.
+export function mergeRows(
+	rows: DiffRow[],
+	destinationHunks: Set<number>,
+	trailingNewline: boolean,
+): string {
+	const merged: string[] = [];
+	for (const row of rows) {
+		if (row.kind === 'gap') {
+			merged.push(...(row.hidden ?? []));
+			continue;
+		}
+		if (row.kind === 'context') {
+			if (row.after) merged.push(row.after.text);
+			continue;
+		}
+		const cell = destinationHunks.has(row.hunk ?? -1) ? row.before : row.after;
+		if (cell) merged.push(cell.text);
+	}
+	const text = merged.join('\n');
+	return text === '' || !trailingNewline ? text : `${text}\n`;
 }
 
 function diffLines(before: string[], after: string[]): DiffLine[] {

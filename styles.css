@@ -766,6 +766,50 @@
 	padding-left: .25rem;
 }
 
+.dns-publishing-hunk {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: .6rem;
+	padding: .2rem .6rem;
+	border-top: 1px solid var(--background-modifier-border);
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	color: var(--text-muted);
+}
+
+.dns-publishing-hunk__actions {
+	display: flex;
+	gap: .35rem;
+}
+
+.dns-publishing-modal .dns-publishing-hunk__button {
+	height: auto;
+	min-height: 0;
+	margin: 0;
+	padding: .1rem .5rem;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: var(--background-secondary);
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	line-height: 1.5;
+	cursor: pointer;
+}
+
+.dns-publishing-modal .dns-publishing-hunk__button.is-selected {
+	border-color: var(--interactive-accent);
+	color: var(--text-normal);
+}
+
+/* The side that loses the run is dimmed rather than hidden, so the rejected
+   text stays readable next to the one that will be published. */
+.dns-publishing-diff__row.is-from-destination .dns-publishing-diff__cell:last-child,
+.dns-publishing-diff__row.is-from-source .dns-publishing-diff__cell:first-child {
+	opacity: .4;
+}
+
 .dns-publishing-diff__gap {
 	padding: .1rem .6rem;
 	background: var(--background-modifier-border);

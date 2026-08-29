@@ -1,9 +1,15 @@
 import { FileSystemAdapter, Notice, Platform, normalizePath } from 'obsidian';
 import type DnsToolkitPlugin from '../main';
-import { compareFolders, readFileDiff, type FolderChange } from './folder-diff';
+import { compareFolders, readFileDiff, type ChangeStatus } from './folder-diff';
 import { ConfirmPublishingModal, PublishingFolderSuggestModal } from './modals';
 
 export type PublishingTargetKind = 'missing' | 'folder' | 'file' | 'symlink';
+
+// What to do with a file whose published version should not simply be the
+// vault copy: keep the destination file as it is, or write a merge of both.
+export type PublishDecision =
+	| { path: string; status: ChangeStatus; kind: 'keep-destination' }
+	| { path: string; kind: 'merge'; text: string };
 
 const STALE_WORK_FOLDER_AGE_MS = 60 * 60 * 1000;
 
@@ -106,7 +112,7 @@ async function openConfirmation(
 			change.status === 'added' ? null : pathModule.join(target, change.path),
 			fileSystem,
 		),
-		onConfirm: (keptChanges) => void publishFolder(source, target, folder, keptChanges),
+		onConfirm: (decisions) => void publishFolder(source, target, folder, decisions),
 	}).open();
 }
 
@@ -114,7 +120,7 @@ async function publishFolder(
 	source: string,
 	target: string,
 	folder: string,
-	keptChanges: FolderChange[],
+	decisions: PublishDecision[],
 ): Promise<void> {
 	const { fileSystem, pathModule } = loadDesktopNodeModules();
 	const parent = pathModule.dirname(target);
@@ -134,7 +140,7 @@ async function publishFolder(
 		await fileSystem.cp(source, staging, { recursive: true, force: false, errorOnExist: true });
 		// The destination is still in place here, so the files the user chose to
 		// keep are backfilled into the staging copy before anything is moved.
-		await keepDestinationFiles(staging, target, keptChanges, fileSystem, pathModule);
+		await applyDecisions(staging, target, decisions, fileSystem, pathModule);
 		try {
 			await fileSystem.rename(target, backup);
 			movedExistingTarget = true;
@@ -145,9 +151,9 @@ async function publishFolder(
 		if (movedExistingTarget) {
 			void fileSystem.rm(backup, { recursive: true, force: true }).catch(() => undefined);
 		}
-		new Notice(keptChanges.length === 0
+		new Notice(decisions.length === 0
 			? `Published “${folder}” successfully.`
-			: `Published “${folder}” successfully, keeping ${keptChanges.length} destination ${keptChanges.length === 1 ? 'file' : 'files'}.`);
+			: `Published “${folder}” successfully with ${decisions.length} ${decisions.length === 1 ? 'file' : 'files'} you adjusted.`);
 	} catch (error) {
 		await fileSystem.rm(staging, { recursive: true, force: true }).catch(() => undefined);
 		if (movedExistingTarget) {
@@ -159,18 +165,23 @@ async function publishFolder(
 	}
 }
 
-// Applies the user's per-file choices to the staging copy: a skipped addition
-// is dropped, and a skipped modification or deletion is restored from the
-// destination as it stands right now.
-async function keepDestinationFiles(
+// Applies the user's choices to the staging copy: a skipped addition is
+// dropped, a skipped modification or deletion is restored from the destination
+// as it stands right now, and a partly accepted file is written as merged.
+async function applyDecisions(
 	staging: string,
 	target: string,
-	keptChanges: FolderChange[],
+	decisions: PublishDecision[],
 	fileSystem: typeof import('node:fs/promises'),
 	pathModule: typeof import('node:path'),
 ): Promise<void> {
-	for (const change of keptChanges) {
+	for (const change of decisions) {
 		const stagedPath = pathModule.join(staging, change.path);
+		if (change.kind === 'merge') {
+			await fileSystem.mkdir(pathModule.dirname(stagedPath), { recursive: true });
+			await fileSystem.writeFile(stagedPath, change.text, 'utf8');
+			continue;
+		}
 		if (change.status === 'added') {
 			await fileSystem.rm(stagedPath, { force: true });
 			await removeEmptyParents(stagedPath, staging, fileSystem, pathModule);

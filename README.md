@@ -71,8 +71,10 @@ The selected top-level folder name is preserved. If the destination already
 exists, the command asks for confirmation and safely replaces it after the new
 copy has completed. The confirmation lists every file that will be added,
 modified, or removed; selecting one shows the current destination and what is
-about to be published side by side, where either version can be chosen for that
-file. Pressing Escape there returns to the list rather than closing the dialog. Each change can be unchecked to
+about to be published side by side. Either version can be chosen for the whole
+file, or one side at a time for each run of changed lines, in which case the
+file is published as a merge of both. Pressing Escape there returns to the list
+rather than closing the dialog. Each change can be unchecked to
 keep the destination version of that file, and the remaining changes are still
 applied in a single atomic replacement. Images are compared side by side with
 their dimensions and file size instead of as text. Symbolic links are rejected. This feature reads only the
