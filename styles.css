@@ -316,11 +316,13 @@
 	--dns-imgcap-font-size: .68rem;
 	--dns-imgcap-font-weight: var(--font-normal, 400);
 	--dns-imgcap-line-height: 1.55;
+	/* Pulls the caption up towards the image it belongs to. */
+	--dns-imgcap-gap-top: -1.25rem;
 }
 
 .dns-custom-container[data-type='imgcap'] {
 	max-width: none;
-	margin: -.75rem 0 clamp(2rem, 5vh, 3rem);
+	margin: var(--dns-imgcap-gap-top) 0 clamp(2rem, 5vh, 3rem);
 	color: var(--dns-imgcap-color);
 	font-family: var(--dns-imgcap-font-family);
 	font-size: var(--dns-imgcap-font-size);
@@ -341,7 +343,7 @@
 }
 
 .markdown-rendered .dns-imgcap-segment--first {
-	margin-top: -.75rem;
+	margin-top: var(--dns-imgcap-gap-top);
 }
 
 .markdown-rendered .dns-imgcap-segment--last {
@@ -1028,8 +1030,15 @@
 	font-size: .9em;
 }
 
-/* Captions read as an afterthought next to the image, in the editor too. */
-.cm-line.dns-cm-block--imgcap {
+/* Captions read as an afterthought next to the image, in the editor too. The
+   editor's own rules for list lines are scoped to the source view, so these
+   are as well or a caption's list would keep the body's size and spacing. */
+.markdown-source-view.mod-cm6 .cm-line.dns-cm-block--imgcap,
+.markdown-source-view.mod-cm6 .cm-line.dns-cm-block--imgcap.HyperMD-list-line {
+	--list-spacing: 0;
+	--line-height-normal: var(--dns-imgcap-line-height);
+	padding-top: 0;
+	padding-bottom: 0;
 	color: var(--dns-imgcap-color);
 	font-family: var(--dns-imgcap-font-family);
 	font-size: .78em;
@@ -1037,20 +1046,16 @@
 	line-height: var(--dns-imgcap-line-height);
 }
 
-/* A caption's list keeps only its indent: the editor's own list spacing would
-   otherwise open gaps the rendered caption does not have. */
-.cm-line.dns-cm-block--imgcap.HyperMD-list-line {
-	--list-spacing: 0;
-	padding-top: 0;
-	padding-bottom: 0;
-	font-size: .78em;
-	line-height: var(--dns-imgcap-line-height);
-}
-
-.cm-line.dns-cm-block--imgcap .cm-formatting-list,
-.cm-line.dns-cm-block--imgcap .list-bullet {
+/* Markers and inline spans carry their own sizing in the editor. */
+.markdown-source-view.mod-cm6 .cm-line.dns-cm-block--imgcap :is(span, div, .list-bullet, .list-number) {
 	font-size: inherit;
 	line-height: inherit;
+}
+
+/* The opening delimiter is the caption's first line, so it sits close to the
+   image the way the rendered caption does. */
+.markdown-source-view.mod-cm6 .cm-line.dns-cm-block--imgcap.dns-cm-block--first {
+	margin-top: var(--dns-imgcap-gap-top, -1.25rem);
 }
 
 .cm-line.dns-cm-block--center {
