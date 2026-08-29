@@ -141,6 +141,17 @@ npm run lint
 npm run build
 ```
 
+Both builds write `main.js` to the repository root, which is where the release
+workflow collects its assets from. To build straight into a vault instead, set
+`DNS_PLUGIN_OUTDIR` in the environment or in an untracked `.env`:
+
+```bash
+DNS_PLUGIN_OUTDIR=/path/to/vault/.obsidian/plugins/dns-toolkit
+```
+
+`manifest.json` and `styles.css` are copied next to `main.js` there, so the
+folder is a complete plugin. Reload Obsidian to pick up a rebuild.
+
 ## Release
 
 Releases are built by GitHub Actions. Before releasing, update the version in
