@@ -1037,6 +1037,22 @@
 	line-height: var(--dns-imgcap-line-height);
 }
 
+/* A caption's list keeps only its indent: the editor's own list spacing would
+   otherwise open gaps the rendered caption does not have. */
+.cm-line.dns-cm-block--imgcap.HyperMD-list-line {
+	--list-spacing: 0;
+	padding-top: 0;
+	padding-bottom: 0;
+	font-size: .78em;
+	line-height: var(--dns-imgcap-line-height);
+}
+
+.cm-line.dns-cm-block--imgcap .cm-formatting-list,
+.cm-line.dns-cm-block--imgcap .list-bullet {
+	font-size: inherit;
+	line-height: inherit;
+}
+
 .cm-line.dns-cm-block--center {
 	text-align: center;
 }
