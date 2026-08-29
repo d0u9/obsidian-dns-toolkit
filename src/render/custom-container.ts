@@ -111,8 +111,9 @@ function singleLine(element: HTMLElement): string | null {
 function delimiterRole(element: HTMLElement): string | null {
 	const text = singleLine(element);
 	if (text === null) return null;
-	if (text === ':::') return 'close';
-	return text.match(DELIMITER)?.[1]?.toLowerCase() ?? null;
+	if (CLOSING_DELIMITER.test(text)) return 'close';
+	// Group 2 is the type; group 1 is the fence itself.
+	return text.match(DELIMITER)?.[2]?.toLowerCase() ?? null;
 }
 
 /** The ancestor of `element` that sits directly inside the preview section. */
@@ -145,7 +146,7 @@ function markListDelimiters(root: HTMLElement): void {
 		const newline = text.lastIndexOf('\n');
 		const line = (newline >= 0 ? text.slice(newline + 1) : text).trim();
 		if (!line.startsWith(':::')) continue;
-		const type = line === ':::' ? 'close' : line.match(DELIMITER)?.[1]?.toLowerCase();
+		const type = CLOSING_DELIMITER.test(line) ? 'close' : line.match(DELIMITER)?.[2]?.toLowerCase();
 		const known = SEGMENT_TYPES.some((name) => name === type);
 		if (type !== 'close' && !known) continue;
 
