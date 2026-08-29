@@ -69,7 +69,9 @@ is populated from the source folder each time the command runs.
 
 The selected top-level folder name is preserved. If the destination already
 exists, the command asks for confirmation and safely replaces it after the new
-copy has completed. Symbolic links are rejected. This feature reads only the
+copy has completed. The confirmation lists every file that will be added,
+modified, or removed; selecting one shows a line diff between the current
+destination and what is about to be published. Symbolic links are rejected. This feature reads only the
 configured source folder and writes only to the external destination selected
 by the user; it makes no network requests.
 

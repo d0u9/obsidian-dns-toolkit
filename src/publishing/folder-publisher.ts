@@ -1,5 +1,6 @@
 import { FileSystemAdapter, Notice, Platform, normalizePath } from 'obsidian';
 import type DnsToolkitPlugin from '../main';
+import { compareFolders, readFileDiff } from './folder-diff';
 import { ConfirmPublishingModal, PublishingFolderSuggestModal } from './modals';
 
 export type PublishingTargetKind = 'missing' | 'folder' | 'file' | 'symlink';
@@ -93,14 +94,20 @@ async function openConfirmation(
 		}
 	}
 
-	new ConfirmPublishingModal(
-		plugin.app,
+	const { pathModule } = loadDesktopNodeModules();
+	new ConfirmPublishingModal(plugin.app, {
 		folder,
 		source,
 		target,
 		targetKind,
-		() => void publishFolder(source, target, folder),
-	).open();
+		compare: () => compareFolders(source, target, fileSystem, pathModule),
+		loadDiff: (change) => readFileDiff(
+			change.status === 'removed' ? null : pathModule.join(source, change.path),
+			change.status === 'added' ? null : pathModule.join(target, change.path),
+			fileSystem,
+		),
+		onConfirm: () => void publishFolder(source, target, folder),
+	}).open();
 }
 
 async function publishFolder(source: string, target: string, folder: string): Promise<void> {
