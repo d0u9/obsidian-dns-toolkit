@@ -3,6 +3,7 @@ import {
 	Platform,
 	PluginSettingTab,
 	Setting,
+	debounce,
 	type SettingDefinitionItem,
 	type SettingGroupItem,
 	type SliderComponent,
@@ -95,6 +96,10 @@ function publishingTargetPlaceholder(): string {
 export class DnsToolkitSettingTab extends PluginSettingTab {
 	private activeSection: 'containers' | 'typography' | 'publishing' = 'containers';
 	private activeTypographyView: 'reading' | 'editing' = 'reading';
+	private typographyPreview: HTMLElement | null = null;
+	// Dragging a slider repaints on every step; the settings file only needs
+	// the value the user settles on.
+	private readonly saveSoon = debounce(() => void this.plugin.saveSettings(), 400, true);
 
 	constructor(app: App, private readonly plugin: DnsToolkitPlugin) {
 		super(app, plugin);
@@ -448,6 +453,8 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 			});
 		}
 
+		this.renderTypographyPreview();
+
 		new Setting(this.containerEl)
 			.setName(this.activeTypographyView === 'reading' ? 'Reading view' : 'Editing view')
 			.setHeading();
@@ -475,6 +482,53 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 		this.addTypographySlider('Word spacing', 'Additional space between words in em.', 'wordSpacing', -0.1, 0.5, 0.01);
 		this.addTypographySlider('Line height', 'Vertical rhythm within paragraphs.', 'lineHeight', 1.2, 2.4, 0.05);
 		this.addTypographySlider('Paragraph spacing', 'Space after ordinary paragraphs in em.', 'paragraphSpacing', 0.25, 2.5, 0.05);
+		this.renderTypographyResetAll([
+			'fontSize', 'letterSpacing', 'wordSpacing', 'lineHeight', 'paragraphSpacing',
+		]);
+	}
+
+	// The settings modal covers the workspace, so the values are mirrored onto a
+	// sample here: it is the only way to see a change while dragging a slider.
+	private renderTypographyPreview(): void {
+		const preview = this.containerEl.createDiv({ cls: 'dns-typography-preview' });
+		preview.createDiv({
+			cls: 'dns-typography-preview__label',
+			text: this.activeTypographyView === 'reading' ? 'Reading view preview' : 'Editing view preview',
+		});
+		const sample = preview.createDiv({ cls: 'dns-typography-preview__sample' });
+		for (const paragraph of PREVIEW_PARAGRAPHS) sample.createEl('p', { text: paragraph });
+		this.typographyPreview = sample;
+		this.applyTypographyPreview();
+	}
+
+	private applyTypographyPreview(): void {
+		const sample = this.typographyPreview;
+		if (!sample) return;
+		const editing = this.activeTypographyView === 'editing';
+		const settings = this.plugin.settings;
+		sample.style.setProperty('font-size', `${editing ? settings.editingFontSize : settings.fontSize}px`);
+		sample.style.setProperty('letter-spacing', `${editing ? settings.editingLetterSpacing : settings.letterSpacing}em`);
+		sample.style.setProperty('word-spacing', `${editing ? settings.editingWordSpacing : settings.wordSpacing}em`);
+		sample.style.setProperty('line-height', String(editing ? settings.editingLineHeight : settings.lineHeight));
+		sample.style.setProperty(
+			'--dns-preview-paragraph-spacing',
+			`${editing ? settings.editingParagraphSpacing : settings.paragraphSpacing}em`,
+		);
+	}
+
+	private renderTypographyResetAll(keys: TypographyNumberKey[]): void {
+		new Setting(this.containerEl)
+			.setName('Reset this view')
+			.setDesc('Restore every value above to its default.')
+			.addButton((button) => button
+				.setIcon('rotate-ccw')
+				.setTooltip('Reset this view')
+				.onClick(async () => {
+					for (const key of keys) this.plugin.settings[key] = DEFAULT_SETTINGS[key];
+					this.plugin.applyTypographySettings();
+					await this.plugin.saveSettings();
+					this.renderActiveSection();
+				}));
 	}
 
 	private renderEditingTypographySettings(): void {
@@ -494,6 +548,10 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 		this.addTypographySlider('Word spacing', 'Additional space between words in em.', 'editingWordSpacing', -0.1, 0.5, 0.01);
 		this.addTypographySlider('Line height', 'Vertical rhythm within editor lines.', 'editingLineHeight', 1.2, 2.4, 0.05);
 		this.addTypographySlider('Paragraph spacing', 'Space after editor paragraphs in em.', 'editingParagraphSpacing', 0, 2.5, 0.05);
+		this.renderTypographyResetAll([
+			'editingFontSize', 'editingLetterSpacing', 'editingWordSpacing',
+			'editingLineHeight', 'editingParagraphSpacing',
+		]);
 	}
 
 	private addTypographySlider(
@@ -518,15 +576,18 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 		minimum: number,
 		maximum: number,
 		step: number,
-	): () => void {
+	): void {
 		let sliderComponent: SliderComponent | null = null;
 		let numberComponent: TextComponent | null = null;
-		let removeSliderListener = (): void => {};
-		const applyValue = (value: number): void => {
-			if (!Number.isFinite(value) || value < minimum || value > maximum) return;
+		const applyValue = (value: number): boolean => {
+			if (!Number.isFinite(value) || value < minimum || value > maximum) return false;
 			this.plugin.settings[key] = value;
 			this.plugin.applyTypographySettings();
+			this.applyTypographyPreview();
+			this.saveSoon();
+			return true;
 		};
+
 		setting.addText((text) => {
 			numberComponent = text;
 			text.inputEl.type = 'number';
@@ -534,51 +595,46 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 			text.inputEl.max = String(maximum);
 			text.inputEl.step = String(step);
 			text.inputEl.addClass('dns-typography-number');
-			text.setValue(String(this.plugin.settings[key])).onChange(async (rawValue) => {
+			text.setValue(String(this.plugin.settings[key])).onChange((rawValue) => {
 				const value = Number(rawValue);
-				applyValue(value);
-				sliderComponent?.setValue(value);
-				await this.plugin.saveSettings();
+				if (applyValue(value)) sliderComponent?.setValue(value);
 			});
 		});
-		const onSliderInput = (event: Event): void => {
-			if (!(event.currentTarget instanceof HTMLInputElement)) return;
-			const value = Number(event.currentTarget.value);
-			applyValue(value);
-			numberComponent?.setValue(String(value));
-		};
 		setting.addSlider((slider) => {
 			sliderComponent = slider;
-			slider.sliderEl.addEventListener('input', onSliderInput);
-			removeSliderListener = () => slider.sliderEl.removeEventListener('input', onSliderInput);
+			// The component reports only when the drag ends, so the live value
+			// is read from the input event instead (setInstant needs v1.6.6).
+			slider.sliderEl.addEventListener('input', () => {
+				const value = Number(slider.sliderEl.value);
+				applyValue(value);
+				numberComponent?.setValue(String(value));
+			});
 			slider
-					.setLimits(minimum, maximum, step)
-					.setValue(this.plugin.settings[key])
-					.onChange(async (value) => {
-						this.plugin.settings[key] = value;
-						numberComponent?.setValue(String(value));
-						this.plugin.applyTypographySettings();
-						await this.plugin.saveSettings();
-					});
+				.setLimits(minimum, maximum, step)
+				.setValue(this.plugin.settings[key])
+				.onChange((value) => {
+					applyValue(value);
+					numberComponent?.setValue(String(value));
+				});
 		});
 		setting.addExtraButton((button) =>
 			button
 				.setIcon('rotate-ccw')
 				.setTooltip(`Reset ${setting.nameEl.textContent?.toLowerCase() ?? 'value'}`)
-				.onClick(async () => {
+				.onClick(() => {
 					const defaultValue = DEFAULT_SETTINGS[key];
-					this.plugin.settings[key] = defaultValue;
+					applyValue(defaultValue);
 					numberComponent?.setValue(String(defaultValue));
 					sliderComponent?.setValue(defaultValue);
-					this.plugin.applyTypographySettings();
-					await this.plugin.saveSettings();
 				}),
 		);
-		return () => {
-			removeSliderListener();
-		};
 	}
 }
+
+const PREVIEW_PARAGRAPHS = [
+	'字体大小、字间距与行高会立刻反映在这段示例文字上，无需关闭设置面板。',
+	'Drag a slider and this sample updates as you go, so the reading rhythm can be judged before it is applied to a note.',
+];
 
 type TypographyNumberKey = Exclude<keyof DnsToolkitSettings,
 	'enableCustomContainers' | 'defaultType' | 'enableTypography' | 'enableEditingTypography'
