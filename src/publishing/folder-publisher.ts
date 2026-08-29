@@ -68,10 +68,14 @@ export async function chooseAndPublishFolder(plugin: DnsToolkitPlugin): Promise<
 			return;
 		}
 
+		// A destination root that is not there yet is legitimate, but it also
+		// means every file will look new, so the confirmation says so.
+		const targetRootMissing = await isMissingFolder(targetRoot, fileSystem);
+
 		new PublishingFolderSuggestModal(plugin.app, folders, (folder) => {
 			const source = pathModule.join(sourceRoot, folder);
 			const target = pathModule.join(targetRoot, folder);
-			void openConfirmation(plugin, folder, source, target);
+			void openConfirmation(plugin, folder, source, target, targetRootMissing ? targetRoot : null);
 		}).open();
 	} catch (error) {
 		new Notice(`Could not read the publishing source: ${errorMessage(error)}`);
@@ -83,6 +87,7 @@ async function openConfirmation(
 	folder: string,
 	source: string,
 	target: string,
+	missingTargetRoot: string | null,
 ): Promise<void> {
 	const { fileSystem } = loadDesktopNodeModules();
 	let targetKind: PublishingTargetKind = 'missing';
@@ -106,6 +111,7 @@ async function openConfirmation(
 		source,
 		target,
 		targetKind,
+		missingTargetRoot,
 		compare: () => compareFolders(source, target, fileSystem, pathModule),
 		resolvePaths: (change) => ({
 			source: change.status === 'removed' ? null : pathModule.join(source, change.path),
@@ -283,6 +289,18 @@ function loadDesktopNodeModules(): {
 function isInside(parent: string, child: string, pathModule: typeof import('node:path')): boolean {
 	const result = pathModule.relative(parent, child);
 	return result === '' || (!result.startsWith('..') && !pathModule.isAbsolute(result));
+}
+
+async function isMissingFolder(
+	path: string,
+	fileSystem: typeof import('node:fs/promises'),
+): Promise<boolean> {
+	try {
+		return !(await fileSystem.stat(path)).isDirectory();
+	} catch (error) {
+		if (isMissingFileError(error)) return true;
+		throw error;
+	}
 }
 
 function isMissingFileError(error: unknown): boolean {

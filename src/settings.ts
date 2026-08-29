@@ -73,6 +73,19 @@ const SUPPORTED_BLOCKS: readonly {
 	},
 ];
 
+// A path copied out of a terminal arrives shell-escaped ("Doug\\ Su"), which
+// resolves to a folder that does not exist and makes every file look new.
+export function normalizePublishingTarget(value: string): string {
+	let path = value.trim();
+	const quote = path.charAt(0);
+	if (path.length > 1 && (quote === '"' || quote === "'") && path.endsWith(quote)) {
+		path = path.slice(1, -1);
+	}
+	// Backslash is a path separator on Windows, so only unescape elsewhere.
+	if (!Platform.isWin) path = path.replace(/\\(?=[^A-Za-z0-9])/g, '');
+	return path.replace(/[\\/]+$/, '') || path;
+}
+
 function publishingTargetPlaceholder(): string {
 	return Platform.isWin
 		? 'C:\\Users\\you\\Documents\\Published Site'
@@ -201,9 +214,12 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 				this.plugin.settings.defaultType = value.trim();
 				break;
 			case 'publishingSourceFolder':
+				if (typeof value !== 'string') return;
+				this.plugin.settings.publishingSourceFolder = value.trim();
+				break;
 			case 'publishingTargetFolder':
 				if (typeof value !== 'string') return;
-				this.plugin.settings[key] = value.trim();
+				this.plugin.settings.publishingTargetFolder = normalizePublishingTarget(value);
 				break;
 			case 'fontSize':
 			case 'letterSpacing':
@@ -350,8 +366,11 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 					.setPlaceholder(publishingTargetPlaceholder())
 					.setValue(this.plugin.settings.publishingTargetFolder)
 					.onChange(async (value) => {
-						this.plugin.settings.publishingTargetFolder = value.trim();
+						this.plugin.settings.publishingTargetFolder = normalizePublishingTarget(value);
 						await this.plugin.saveSettings();
+					});
+					text.inputEl.addEventListener('blur', () => {
+						text.setValue(this.plugin.settings.publishingTargetFolder);
 					});
 			});
 

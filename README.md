@@ -64,7 +64,9 @@ command to wrap selected text or insert a new container.
 The optional desktop-only folder publishing feature copies one direct
 subfolder, such as `publish/02`, to a configured folder outside the vault.
 Configure and enable it under **Settings → DnS Toolkit → Folder publishing**,
-then run **Publish folder to final publishing folder**. The searchable picker
+then run **Publish folder to final publishing folder**. A destination path
+copied from a terminal may arrive shell-escaped or quoted; the setting strips
+that so the path still points at the real folder. The searchable picker
 is populated from the source folder each time the command runs.
 
 The selected top-level folder name is preserved. If the destination already

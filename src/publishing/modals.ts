@@ -51,6 +51,7 @@ export interface ConfirmPublishingOptions {
 	source: string;
 	target: string;
 	targetKind: PublishingTargetKind;
+	missingTargetRoot: string | null;
 	compare: () => Promise<FolderComparison>;
 	resolvePaths: (change: FolderChange) => {
 		source: string | null;
@@ -126,6 +127,13 @@ export class ConfirmPublishingModal extends Modal {
 		const paths = this.contentEl.createDiv({ cls: 'dns-publishing-preview' });
 		paths.createDiv({ text: `Source: ${this.options.source}` });
 		paths.createDiv({ text: `Destination: ${this.options.target}` });
+
+		if (this.options.missingTargetRoot) {
+			this.contentEl.createDiv({
+				cls: 'dns-publishing-warning',
+				text: `The final publishing folder ${this.options.missingTargetRoot} does not exist yet, so every file counts as new. Check the path in settings if that is unexpected.`,
+			});
+		}
 
 		this.renderChanges(comparisonError);
 
