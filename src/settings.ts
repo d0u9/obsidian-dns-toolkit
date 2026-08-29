@@ -14,6 +14,7 @@ import type DnsToolkitPlugin from './main';
 
 export interface DnsToolkitSettings {
 	enableCustomContainers: boolean;
+	enableEditorColonBlocks: boolean;
 	defaultType: string;
 	enableTypography: boolean;
 	fontFamily: string;
@@ -38,6 +39,7 @@ export interface DnsToolkitSettings {
 
 export const DEFAULT_SETTINGS: DnsToolkitSettings = {
 	enableCustomContainers: true,
+	enableEditorColonBlocks: true,
 	defaultType: 'note',
 	enableTypography: false,
 	fontFamily: '',
@@ -112,6 +114,15 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 							type: 'toggle',
 							key: 'enableCustomContainers',
 							defaultValue: DEFAULT_SETTINGS.enableCustomContainers,
+						},
+					},
+					{
+						name: 'Style blocks while editing',
+						desc: 'Shape colon blocks in the editor as well as in reading view.',
+						control: {
+							type: 'toggle',
+							key: 'enableEditorColonBlocks',
+							defaultValue: DEFAULT_SETTINGS.enableEditorColonBlocks,
 						},
 					},
 					{
@@ -201,6 +212,7 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 	async setControlValue(key: string, value: unknown): Promise<void> {
 		switch (key) {
 			case 'enableCustomContainers':
+			case 'enableEditorColonBlocks':
 			case 'enableTypography':
 			case 'enableEditingTypography':
 			case 'enableFolderPublishing':
@@ -247,7 +259,7 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 			await this.plugin.saveSettings();
 			return;
 		}
-		if (key === 'enableCustomContainers') {
+		if (key === 'enableCustomContainers' || key === 'enableEditorColonBlocks') {
 			this.plugin.refreshCustomContainers();
 		} else if (key !== 'defaultType') {
 			this.plugin.applyTypographySettings();
@@ -404,6 +416,19 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.enableCustomContainers)
 					.onChange(async (value) => {
 						this.plugin.settings.enableCustomContainers = value;
+						await this.plugin.saveSettings();
+						this.plugin.refreshCustomContainers();
+					}),
+			);
+
+		new Setting(this.containerEl)
+			.setName('Style blocks while editing')
+			.setDesc('Shape colon blocks in the editor as well as in reading view.')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableEditorColonBlocks)
+					.onChange(async (value) => {
+						this.plugin.settings.enableEditorColonBlocks = value;
 						await this.plugin.saveSettings();
 						this.plugin.refreshCustomContainers();
 					}),
@@ -692,6 +717,7 @@ const PREVIEW_PARAGRAPHS = [
 ];
 
 type TypographyNumberKey = Exclude<keyof DnsToolkitSettings,
-	'enableCustomContainers' | 'defaultType' | 'enableTypography' | 'enableEditingTypography'
+	'enableCustomContainers' | 'enableEditorColonBlocks' | 'defaultType'
+	| 'enableTypography' | 'enableEditingTypography'
 	| 'enableFolderPublishing' | 'publishingSourceFolder' | 'publishingTargetFolder'
 	| 'fontFamily' | 'editingFontFamily'>;

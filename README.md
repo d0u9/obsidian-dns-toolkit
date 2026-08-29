@@ -14,6 +14,32 @@ Markdown content goes here. **Formatting** and lists are supported.
 :::
 ```
 
+The brace section takes any `key=value` pair and `.class` shorthands:
+
+```markdown
+::: aside{width=60% align=center .wide} Optional title
+```
+
+`height`, `width`, `max-width` and `min-height` must be CSS lengths and become
+inline styles, `align` accepts the four CSS keywords, a `.class` becomes
+`dns-x-<name>`, and every other pair becomes a `data-<key>` attribute to style
+from a snippet. A longer fence closes only on a fence at least as long, so
+blocks can nest:
+
+```markdown
+:::: aside
+
+::: poem
+An inner block.
+:::
+
+::::
+```
+
+Typing an opening delimiter suggests the supported types, and the editor styles
+the lines a block spans so its shape is visible while writing. An opening
+delimiter that is never closed is marked in both views.
+
 Blank lines after the opening delimiter and before the closing delimiter are
 recommended because they let Obsidian parse the body as full block Markdown.
 The renderer also accepts compact containers without those blank lines.

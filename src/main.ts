@@ -1,5 +1,6 @@
 import { MarkdownView, Notice, Plugin } from 'obsidian';
 import { registerCommands } from './commands';
+import { colonBlockEditorExtension } from './editor/block-decorations';
 import { ColonBlockSuggest } from './editor/block-suggest';
 import {
 	containsCrossSectionDelimiter,
@@ -29,6 +30,7 @@ export default class DnsToolkitPlugin extends Plugin {
 
 		registerCommands(this);
 		this.registerEditorSuggest(new ColonBlockSuggest(this.app));
+		this.registerEditorExtension(colonBlockEditorExtension(this));
 		this.addSettingTab(new DnsToolkitSettingTab(this.app, this));
 		this.observeCrossSectionContainers();
 		this.renderMountedCrossSectionContainers();
@@ -177,6 +179,9 @@ export default class DnsToolkitPlugin extends Plugin {
 	}
 
 	refreshCustomContainers(): void {
+		// Editor decorations read the settings as they build, so ask CodeMirror
+		// to reconfigure alongside the rendered previews.
+		this.app.workspace.updateOptions();
 		for (const preview of Array.from(
 			this.app.workspace.containerEl.querySelectorAll<HTMLElement>(
 				'.markdown-preview-sizer',

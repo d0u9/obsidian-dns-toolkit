@@ -964,3 +964,57 @@
 	text-underline-offset: .2em;
 	cursor: help;
 }
+
+/* Editor shapes: the same reading rhythm, applied to lines rather than to a
+   rebuilt DOM, so the text stays editable. */
+.cm-line.dns-cm-delimiter {
+	color: var(--text-faint);
+	font-family: var(--font-monospace);
+	font-size: .85em;
+}
+
+.cm-line.dns-cm-unclosed {
+	color: var(--color-red);
+	text-decoration: underline dotted var(--color-red);
+	text-underline-offset: .2em;
+}
+
+.cm-line.dns-cm-block--lead {
+	color: var(--text-muted);
+	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
+	font-size: .96em;
+	line-height: 1.75;
+}
+
+.cm-line.dns-cm-block--epigraph {
+	color: var(--text-muted);
+	font-size: .92em;
+	text-align: right;
+}
+
+.cm-line.dns-cm-block--poem {
+	padding-inline-start: clamp(1rem, 3vw, 2rem);
+	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
+	letter-spacing: .012em;
+}
+
+.cm-line.dns-cm-block--aside {
+	padding-inline-start: .9em;
+	border-inline-start: 2px solid var(--background-modifier-border);
+	color: var(--text-muted);
+	font-size: .94em;
+}
+
+.cm-line.dns-cm-block--imgcap,
+.cm-line.dns-cm-block--compnote {
+	color: var(--text-muted);
+	font-size: .9em;
+}
+
+.cm-line.dns-cm-block--center {
+	text-align: center;
+}
+
+.cm-line.dns-cm-block--nested {
+	background: color-mix(in srgb, var(--text-faint) 6%, transparent);
+}
