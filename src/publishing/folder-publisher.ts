@@ -74,7 +74,9 @@ export async function chooseAndPublishFolder(plugin: DnsToolkitPlugin): Promise<
 		const folders = entries
 			.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
 			.map((entry) => entry.name)
-			.sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+			// Newest first: these folders are named by date, and the one just
+			// written is the one about to be published.
+			.sort((left, right) => right.localeCompare(left, undefined, { numeric: true }));
 		if (folders.length === 0) {
 			new Notice('No publishable subfolders were found.');
 			return;

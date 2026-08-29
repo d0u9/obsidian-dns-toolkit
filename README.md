@@ -102,7 +102,8 @@ Configure and enable it under **Settings → DnS Toolkit → Folder publishing**
 then run **Publish folder to final publishing folder**. A destination path
 copied from a terminal may arrive shell-escaped or quoted; the setting strips
 that so the path still points at the real folder. The searchable picker
-is populated from the source folder each time the command runs.
+is populated from the source folder each time the command runs, newest name
+first.
 
 The selected top-level folder name is preserved. If the destination already
 exists, the command asks for confirmation and safely replaces it after the new
