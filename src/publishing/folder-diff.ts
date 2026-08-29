@@ -15,7 +15,7 @@ export interface FolderComparison {
 }
 
 export type FileDiff =
-	| { kind: 'text'; lines: DiffLine[] }
+	| { kind: 'text'; rows: DiffRow[] }
 	| { kind: 'image'; before: ImageFile | null; after: ImageFile | null }
 	| { kind: 'binary' }
 	| { kind: 'too-large' }
@@ -27,11 +27,25 @@ export interface ImageFile {
 	mime: string;
 }
 
-export interface DiffLine {
+interface DiffLine {
 	kind: 'context' | 'add' | 'remove' | 'gap';
 	text: string;
 	beforeLine?: number;
 	afterLine?: number;
+}
+
+export interface DiffCell {
+	line: number;
+	text: string;
+}
+
+// One row of the side-by-side view. A changed row may hold a cell on only one
+// side when an edit adds or deletes lines.
+export interface DiffRow {
+	kind: 'context' | 'change' | 'gap';
+	before: DiffCell | null;
+	after: DiffCell | null;
+	text?: string;
 }
 
 // Publishing folders hold prose, so these ceilings only guard against a stray
@@ -111,7 +125,7 @@ export async function readFileDiff(
 
 	const beforeLines = splitLines(before.text);
 	const afterLines = splitLines(after.text);
-	return { kind: 'text', lines: buildHunks(beforeLines, afterLines) };
+	return { kind: 'text', rows: pairRows(buildHunks(beforeLines, afterLines)) };
 }
 
 function imageMimeType(path: string): string | null {
@@ -243,6 +257,48 @@ function buildHunks(before: string[], after: string[]): DiffLine[] {
 	});
 	flush();
 	return lines;
+}
+
+// Zips each run of removed and added lines into rows so both versions can be
+// read across from one another.
+function pairRows(lines: DiffLine[]): DiffRow[] {
+	const rows: DiffRow[] = [];
+	let index = 0;
+	while (index < lines.length) {
+		const line = lines[index]!;
+		if (line.kind === 'gap') {
+			rows.push({ kind: 'gap', before: null, after: null, text: line.text });
+			index += 1;
+			continue;
+		}
+		if (line.kind === 'context') {
+			rows.push({
+				kind: 'context',
+				before: { line: line.beforeLine ?? 0, text: line.text },
+				after: { line: line.afterLine ?? 0, text: line.text },
+			});
+			index += 1;
+			continue;
+		}
+
+		const removed: DiffCell[] = [];
+		const added: DiffCell[] = [];
+		while (index < lines.length) {
+			const run = lines[index]!;
+			if (run.kind === 'remove') removed.push({ line: run.beforeLine ?? 0, text: run.text });
+			else if (run.kind === 'add') added.push({ line: run.afterLine ?? 0, text: run.text });
+			else break;
+			index += 1;
+		}
+		for (let offset = 0; offset < Math.max(removed.length, added.length); offset += 1) {
+			rows.push({
+				kind: 'change',
+				before: removed[offset] ?? null,
+				after: added[offset] ?? null,
+			});
+		}
+	}
+	return rows;
 }
 
 function diffLines(before: string[], after: string[]): DiffLine[] {

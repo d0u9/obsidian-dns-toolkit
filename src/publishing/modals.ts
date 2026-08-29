@@ -1,6 +1,6 @@
 import { FuzzySuggestModal, Modal, Setting } from 'obsidian';
 import type { PublishingTargetKind } from './folder-publisher';
-import type { FileDiff, FolderChange, FolderComparison, ImageFile } from './folder-diff';
+import type { DiffCell, FileDiff, FolderChange, FolderComparison, ImageFile } from './folder-diff';
 
 export class PublishingFolderSuggestModal extends FuzzySuggestModal<string> {
 	constructor(
@@ -273,7 +273,7 @@ export class ConfirmPublishingModal extends Modal {
 		this.contentEl.addClass('dns-publishing-content--diff');
 		this.contentEl.createDiv({
 			cls: 'dns-publishing-diff__legend',
-			text: `${CHANGE_LABELS[change.status]} — the current destination on the left or in red, what will be published on the right or in green.`,
+			text: `${CHANGE_LABELS[change.status]} — the current destination on the left, what will be published on the right.`,
 		});
 		const body = this.contentEl.createDiv({ cls: 'dns-publishing-diff' });
 		body.createDiv({ cls: 'dns-publishing-diff__note', text: 'Loading…' });
@@ -314,25 +314,18 @@ export class ConfirmPublishingModal extends Modal {
 			body.createDiv({ cls: 'dns-publishing-diff__note', text: NON_TEXT_NOTES[diff.kind] });
 			return;
 		}
-		for (const line of diff.lines) {
-			const row = body.createDiv({ cls: `dns-publishing-diff__line is-${line.kind}` });
-			if (line.kind === 'gap') {
-				row.createSpan({ cls: 'dns-publishing-diff__gap', text: `⋯ ${line.text}` });
+		body.addClass('dns-publishing-diff--text');
+		const header = body.createDiv({ cls: 'dns-publishing-diff__header' });
+		header.createSpan({ text: 'Current destination' });
+		header.createSpan({ text: 'To be published' });
+		for (const row of diff.rows) {
+			if (row.kind === 'gap') {
+				body.createDiv({ cls: 'dns-publishing-diff__gap', text: `⋯ ${row.text ?? ''}` });
 				continue;
 			}
-			row.createSpan({
-				cls: 'dns-publishing-diff__gutter',
-				text: line.beforeLine === undefined ? '' : String(line.beforeLine),
-			});
-			row.createSpan({
-				cls: 'dns-publishing-diff__gutter',
-				text: line.afterLine === undefined ? '' : String(line.afterLine),
-			});
-			row.createSpan({
-				cls: 'dns-publishing-diff__sign',
-				text: line.kind === 'add' ? '+' : line.kind === 'remove' ? '−' : ' ',
-			});
-			row.createSpan({ cls: 'dns-publishing-diff__text', text: line.text });
+			const element = body.createDiv({ cls: `dns-publishing-diff__row is-${row.kind}` });
+			renderDiffCell(element, row.before, row.kind === 'change' ? 'remove' : 'context');
+			renderDiffCell(element, row.after, row.kind === 'change' ? 'add' : 'context');
 		}
 	}
 }
@@ -348,6 +341,16 @@ const NON_TEXT_NOTES: Record<'binary' | 'too-large' | 'identical', string> = {
 	'too-large': 'This file is too large to diff.',
 	identical: 'The file contents are identical.',
 };
+
+function renderDiffCell(
+	row: HTMLElement,
+	cell: DiffCell | null,
+	tone: 'context' | 'add' | 'remove',
+): void {
+	const side = row.createDiv({ cls: `dns-publishing-diff__cell is-${cell ? tone : 'empty'}` });
+	side.createSpan({ cls: 'dns-publishing-diff__gutter', text: cell ? String(cell.line) : '' });
+	side.createSpan({ cls: 'dns-publishing-diff__text', text: cell?.text ?? '' });
+}
 
 function formatBytes(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`;
