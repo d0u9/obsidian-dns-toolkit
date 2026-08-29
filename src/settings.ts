@@ -1,5 +1,6 @@
 import {
 	App,
+	Platform,
 	PluginSettingTab,
 	Setting,
 	type SettingDefinitionItem,
@@ -71,6 +72,12 @@ const SUPPORTED_BLOCKS: readonly {
 		example: ':::spacer{height=5rem}',
 	},
 ];
+
+function publishingTargetPlaceholder(): string {
+	return Platform.isWin
+		? 'C:\\Users\\you\\Documents\\Published Site'
+		: '/Users/you/Documents/Published Site';
+}
 
 export class DnsToolkitSettingTab extends PluginSettingTab {
 	private activeSection: 'containers' | 'typography' | 'publishing' = 'containers';
@@ -162,12 +169,12 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 					},
 					{
 						name: 'Final publishing folder',
-						desc: 'Absolute path outside this vault. The selected folder name is preserved.',
+						desc: 'Absolute path to a folder outside this vault. The selected folder name is preserved.',
 						control: {
 							type: 'text',
 							key: 'publishingTargetFolder',
 							defaultValue: DEFAULT_SETTINGS.publishingTargetFolder,
-							placeholder: '/xxx/finalpublishing',
+							placeholder: publishingTargetPlaceholder(),
 							validate: (value) => value.trim() ? undefined : 'Enter a destination folder.',
 						},
 					},
@@ -336,11 +343,11 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 
 		new Setting(this.containerEl)
 			.setName('Final publishing folder')
-			.setDesc('Absolute path outside this vault. The selected folder name is preserved.')
+			.setDesc('Absolute path to a folder outside this vault. The selected folder name is preserved.')
 			.addText((text) => {
 				text.inputEl.addClass('dns-publishing-path');
 				text
-					.setPlaceholder('/xxx/finalpublishing')
+					.setPlaceholder(publishingTargetPlaceholder())
 					.setValue(this.plugin.settings.publishingTargetFolder)
 					.onChange(async (value) => {
 						this.plugin.settings.publishingTargetFolder = value.trim();

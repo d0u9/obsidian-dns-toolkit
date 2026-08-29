@@ -2,7 +2,17 @@ import { FileSystemAdapter, Notice, Platform, normalizePath } from 'obsidian';
 import type DnsToolkitPlugin from '../main';
 import { ConfirmPublishingModal, PublishingFolderSuggestModal } from './modals';
 
+export type PublishingTargetKind = 'missing' | 'folder' | 'file' | 'symlink';
+
+const STALE_WORK_FOLDER_AGE_MS = 60 * 60 * 1000;
+
+let publishInProgress = false;
+
 export async function chooseAndPublishFolder(plugin: DnsToolkitPlugin): Promise<void> {
+	if (publishInProgress) {
+		new Notice('A folder is already being published.');
+		return;
+	}
 	if (!plugin.settings.enableFolderPublishing) {
 		new Notice('Enable folder publishing in DNS toolkit settings first.');
 		return;
@@ -68,10 +78,14 @@ async function openConfirmation(
 	target: string,
 ): Promise<void> {
 	const { fileSystem } = loadDesktopNodeModules();
-	let targetExists = false;
+	let targetKind: PublishingTargetKind = 'missing';
 	try {
-		await fileSystem.stat(target);
-		targetExists = true;
+		// lstat, not stat: a symbolic link at the destination is replaced as a
+		// link, so the confirmation must say so rather than describe its target.
+		const stats = await fileSystem.lstat(target);
+		if (stats.isSymbolicLink()) targetKind = 'symlink';
+		else if (stats.isDirectory()) targetKind = 'folder';
+		else targetKind = 'file';
 	} catch (error) {
 		if (!isMissingFileError(error)) {
 			new Notice(`Could not inspect the destination: ${errorMessage(error)}`);
@@ -84,7 +98,7 @@ async function openConfirmation(
 		folder,
 		source,
 		target,
-		targetExists,
+		targetKind,
 		() => void publishFolder(source, target, folder),
 	).open();
 }
@@ -97,10 +111,15 @@ async function publishFolder(source: string, target: string, folder: string): Pr
 	const backup = pathModule.join(parent, `.${pathModule.basename(target)}.dns-backup-${suffix}`);
 	let movedExistingTarget = false;
 
+	publishInProgress = true;
 	try {
+		await removeStaleWorkFolders(parent, pathModule.basename(target), fileSystem, pathModule);
+		if ((await fileSystem.lstat(source)).isSymbolicLink()) {
+			throw new Error('Symbolic links are not supported.');
+		}
 		await assertNoSymbolicLinks(source, fileSystem, pathModule);
 		await fileSystem.mkdir(parent, { recursive: true });
-		await fileSystem.cp(source, staging, { recursive: true, errorOnExist: true });
+		await fileSystem.cp(source, staging, { recursive: true, force: false, errorOnExist: true });
 		try {
 			await fileSystem.rename(target, backup);
 			movedExistingTarget = true;
@@ -118,6 +137,39 @@ async function publishFolder(source: string, target: string, folder: string): Pr
 			await fileSystem.rename(backup, target).catch(() => undefined);
 		}
 		new Notice(`Could not publish “${folder}”: ${errorMessage(error)}`);
+	} finally {
+		publishInProgress = false;
+	}
+}
+
+// A crash between the renames below leaves a hidden staging or backup folder
+// next to the destination. Sweep the leftovers of earlier runs, keeping recent
+// ones in case another window is publishing right now.
+async function removeStaleWorkFolders(
+	parent: string,
+	basename: string,
+	fileSystem: typeof import('node:fs/promises'),
+	pathModule: typeof import('node:path'),
+): Promise<void> {
+	const prefixes = [`.${basename}.dns-copy-`, `.${basename}.dns-backup-`];
+	let entries;
+	try {
+		entries = await fileSystem.readdir(parent, { withFileTypes: true });
+	} catch (error) {
+		if (isMissingFileError(error)) return;
+		throw error;
+	}
+	const cutoff = Date.now() - STALE_WORK_FOLDER_AGE_MS;
+	for (const entry of entries) {
+		if (!prefixes.some((prefix) => entry.name.startsWith(prefix))) continue;
+		const path = pathModule.join(parent, entry.name);
+		try {
+			const stats = await fileSystem.lstat(path);
+			if (stats.mtimeMs > cutoff) continue;
+			await fileSystem.rm(path, { recursive: true, force: true });
+		} catch {
+			// A leftover we cannot inspect or delete must not block publishing.
+		}
 	}
 }
 
