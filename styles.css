@@ -956,3 +956,11 @@
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 }
+
+/* An opening delimiter with no closing fence stays visible and says why. */
+.dns-unclosed-delimiter {
+	color: var(--text-muted);
+	text-decoration: underline dotted var(--color-red);
+	text-underline-offset: .2em;
+	cursor: help;
+}

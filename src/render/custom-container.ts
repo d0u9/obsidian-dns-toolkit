@@ -1,12 +1,19 @@
-const DELIMITER = /^:::\s*(?:([a-zA-Z][a-zA-Z0-9_-]*)(?:\{([^}]*)\})?(?:\s+(.+))?)?\s*$/;
+const DELIMITER = /^(:{3,})\s*(?:([a-zA-Z][a-zA-Z0-9_-]*)(?:\{([^}]*)\})?(?:\s+(.+))?)?\s*$/;
+const CLOSING_DELIMITER = /^(:{3,})\s*$/;
+const ATTRIBUTE_NAME = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
+const ALIGNMENTS = new Set(['left', 'center', 'right', 'justify']);
+const LENGTH_ATTRIBUTES = new Set(['height', 'width', 'max-width', 'min-height']);
 const TYPE_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
 const HEIGHT_PATTERN = /^(?:0|(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|vh|vw|vmin|vmax|%))$/i;
 const CJK_PATTERN = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
 
 interface OpeningDelimiter {
+	fence: number;
 	type: string;
 	title?: string;
-	height?: string;
+	attributes: Map<string, string>;
+	classes: string[];
+	raw?: string;
 }
 
 const ADJACENCY_CLASSES = ['dns-before-imgcap', 'dns-before-compnote'] as const;
@@ -168,26 +175,85 @@ function unwrapListDelimiters(root: HTMLElement): void {
 	}
 }
 
+/**
+ * Reads `{height=5rem width=60% .wide #note align=center}` into named values and
+ * classes. Anything malformed is dropped rather than passed on to the DOM.
+ */
+function parseAttributes(text: string | undefined): {
+	attributes: Map<string, string>;
+	classes: string[];
+} {
+	const attributes = new Map<string, string>();
+	const classes: string[] = [];
+	for (const token of (text ?? '').match(/(?:[^\s"']|"[^"]*"|'[^']*')+/g) ?? []) {
+		if (token.startsWith('.')) {
+			const name = token.slice(1);
+			if (ATTRIBUTE_NAME.test(name)) classes.push(name.toLowerCase());
+			continue;
+		}
+		const separator = token.indexOf('=');
+		if (separator < 0) {
+			if (ATTRIBUTE_NAME.test(token)) attributes.set(token.toLowerCase(), '');
+			continue;
+		}
+		const name = token.slice(0, separator).trim().toLowerCase();
+		if (!ATTRIBUTE_NAME.test(name)) continue;
+		let value = token.slice(separator + 1).trim();
+		const quote = value.charAt(0);
+		if (value.length > 1 && (quote === '"' || quote === "'") && value.endsWith(quote)) {
+			value = value.slice(1, -1);
+		}
+		attributes.set(name, value.replace(/[;{}]/g, '').trim());
+	}
+	return { attributes, classes };
+}
+
 function parseOpeningDelimiter(
 	text: string,
 	defaultType: string,
 ): OpeningDelimiter | null {
 	const match = text.match(DELIMITER);
 	if (!match) return null;
-	const type = match[1] ?? defaultType;
+	const type = match[2] ?? defaultType;
 	if (!TYPE_PATTERN.test(type)) return null;
-	const attributes = match[2]?.trim();
-	const heightMatch = attributes?.match(/^height\s*=\s*(\S+)$/i);
-	const height = heightMatch?.[1];
+	const { attributes, classes } = parseAttributes(match[3]);
 	return {
+		fence: (match[1] ?? ':::').length,
 		type: type.toLowerCase(),
-		title: match[3]?.trim(),
-		height: height && HEIGHT_PATTERN.test(height) ? height : undefined,
+		title: match[4]?.trim(),
+		attributes,
+		classes,
+		raw: match[3]?.trim(),
 	};
 }
 
-function isClosingDelimiter(element: HTMLElement | undefined): boolean {
-	return element !== undefined && singleLine(element) === ':::';
+/** Turns parsed attributes into styles, classes and data hooks for CSS. */
+function applyAttributes(container: HTMLElement, opening: OpeningDelimiter): void {
+	for (const name of opening.classes) container.addClass(`dns-x-${name}`);
+	for (const [name, value] of opening.attributes) {
+		if (LENGTH_ATTRIBUTES.has(name)) {
+			if (!HEIGHT_PATTERN.test(value)) continue;
+			container.style.setProperty(name, value);
+			if (name === 'height') container.dataset.height = value;
+			continue;
+		}
+		if (name === 'align') {
+			if (!ALIGNMENTS.has(value)) continue;
+			container.style.setProperty('text-align', value);
+			continue;
+		}
+		// Everything else becomes a data hook, so new styles need no new code.
+		container.setAttribute(`data-${name}`, value);
+	}
+	if (opening.raw) container.dataset.attributes = opening.raw;
+}
+
+/** A closing fence must be at least as long as the one that opened the block. */
+function isClosingDelimiter(element: HTMLElement | undefined, fence: number): boolean {
+	if (element === undefined) return false;
+	const line = singleLine(element);
+	const match = line?.match(CLOSING_DELIMITER);
+	return !!match && (match[1] ?? '').length >= fence;
 }
 
 function boundaryAt(root: Node, offset: number): [Node, number] {
@@ -378,7 +444,13 @@ function markCrossSectionImgcaps(root: HTMLElement): void {
 export function renderCustomContainers(root: HTMLElement, defaultType: string): void {
 	clearAdjacencyClasses(root);
 	splitCompactDelimiterParagraphs(root);
+	buildContainers(root, defaultType);
 
+	const preview = root.closest<HTMLElement>('.markdown-preview-sizer');
+	if (preview) markCrossSectionBlocks(preview);
+}
+
+function buildContainers(root: HTMLElement, defaultType: string): void {
 	const children = Array.from(root.children) as HTMLElement[];
 	for (let index = 0; index < children.length; index += 1) {
 		const opener = children[index];
@@ -389,27 +461,33 @@ export function renderCustomContainers(root: HTMLElement, defaultType: string): 
 		let closingIndex = index + 1;
 		while (
 			closingIndex < children.length &&
-			!isClosingDelimiter(children[closingIndex])
+			!isClosingDelimiter(children[closingIndex], opening.fence)
 		) {
 			closingIndex += 1;
 		}
 		const closer = children[closingIndex];
-		if (!closer) continue;
+		if (!closer) {
+			// Say so rather than rendering the rest of the note as plain text.
+			opener.addClass('dns-unclosed-delimiter');
+			const message = `This ${':'.repeat(opening.fence)} block is never closed.`;
+			opener.setAttribute('aria-label', message);
+			opener.setAttribute('title', message);
+			continue;
+		}
+		opener.removeClass('dns-unclosed-delimiter');
 
 		// These types are marked in place so Obsidian keeps owning their sections.
 		// Skip past the closer too, or it would read as the next block's opener.
 		const segmentOnly = SEGMENT_ONLY_TYPES.some((type) => type === opening.type);
-		if (segmentOnly && !opening.title && !opening.height) {
+		if (segmentOnly && !opening.title && opening.attributes.size === 0 && opening.classes.length === 0) {
 			index = closingIndex;
 			continue;
 		}
 
 		const container = createDiv({ cls: 'dns-custom-container' });
 		container.dataset.type = opening.type;
-		if (opening.height) {
-			container.dataset.height = opening.height;
-			container.style.height = opening.height;
-		}
+		container.dataset.fence = String(opening.fence);
+		applyAttributes(container, opening);
 
 		if (opening.title) {
 			const title = container.createDiv({ cls: 'dns-custom-container__title' });
@@ -424,6 +502,8 @@ export function renderCustomContainers(root: HTMLElement, defaultType: string): 
 		if (containsCjk(content.textContent ?? '')) {
 			container.classList.add('dns-custom-container--cjk');
 		}
+		// A longer fence may wrap blocks of its own.
+		if (opening.fence > 3) buildContainers(content, defaultType);
 		const precedingBlock = opener.previousElementSibling;
 		if (opening.type === 'imgcap') {
 			precedingBlock?.addClass('dns-before-imgcap');
@@ -434,9 +514,6 @@ export function renderCustomContainers(root: HTMLElement, defaultType: string): 
 		closer.remove();
 		index = closingIndex;
 	}
-
-	const preview = root.closest<HTMLElement>('.markdown-preview-sizer');
-	if (preview) markCrossSectionBlocks(preview);
 }
 
 export function restoreCustomContainers(root: HTMLElement): void {
@@ -446,7 +523,8 @@ export function restoreCustomContainers(root: HTMLElement): void {
 		root.querySelectorAll<HTMLElement>('.dns-custom-container'),
 	)) {
 		const type = container.dataset.type ?? 'note';
-		const height = container.dataset.height;
+		const attributes = container.dataset.attributes;
+		const fence = ':'.repeat(Number(container.dataset.fence) || 3);
 		const title = container.querySelector<HTMLElement>(
 			':scope > .dns-custom-container__title',
 		)?.textContent;
@@ -454,9 +532,9 @@ export function restoreCustomContainers(root: HTMLElement): void {
 			':scope > .dns-custom-container__content',
 		);
 		const opener = createEl('p', {
-			text: `:::${type}${height ? `{height=${height}}` : ''}${title ? ` ${title}` : ''}`,
+			text: `${fence}${type}${attributes ? `{${attributes}}` : ''}${title ? ` ${title}` : ''}`,
 		});
-		const closer = createEl('p', { text: ':::' });
+		const closer = createEl('p', { text: fence });
 		const contentNodes = content ? Array.from(content.childNodes) : [];
 		container.replaceWith(opener, ...contentNodes, closer);
 	}
