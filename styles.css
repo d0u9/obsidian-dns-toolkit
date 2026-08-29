@@ -540,16 +540,22 @@
 	font-size: var(--font-ui-smaller);
 }
 
+/* Fed the same custom properties the workspace gets, so the sample and a note
+   cannot disagree about what a value means. */
 .dns-typography-preview__sample {
-	--dns-preview-paragraph-spacing: 1em;
 	max-height: 13rem;
+	max-width: var(--dns-line-width);
 	overflow-y: auto;
 	color: var(--text-normal);
-	font-family: var(--font-text);
+	font-family: var(--dns-font-family, var(--font-text));
+	font-size: var(--dns-font-size);
+	letter-spacing: var(--dns-letter-spacing);
+	word-spacing: var(--dns-word-spacing);
+	line-height: var(--dns-line-height);
 }
 
 .dns-typography-preview__sample p {
-	margin-block: 0 var(--dns-preview-paragraph-spacing);
+	margin-block: 0 var(--dns-paragraph-spacing);
 }
 
 .dns-typography-preview__sample p:last-child {
@@ -557,13 +563,13 @@
 }
 
 .dns-typography-preview__heading {
-	margin-block: 0 var(--dns-preview-paragraph-spacing);
+	margin-block: 0 var(--dns-paragraph-spacing);
 	font-size: 1.3em;
 	line-height: inherit;
 }
 
 .dns-typography-preview__sample blockquote {
-	margin-block: 0 var(--dns-preview-paragraph-spacing);
+	margin-block: 0 var(--dns-paragraph-spacing);
 	margin-inline: 0;
 	padding-inline-start: .8em;
 	border-inline-start: 2px solid var(--background-modifier-border);

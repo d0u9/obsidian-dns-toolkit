@@ -13,6 +13,7 @@ import {
 	normalizePublishingTarget,
 	type DnsToolkitSettings,
 } from './settings';
+import { applyVariables, typographyVariables } from './typography';
 
 export default class DnsToolkitPlugin extends Plugin {
 	settings!: DnsToolkitSettings;
@@ -45,24 +46,10 @@ export default class DnsToolkitPlugin extends Plugin {
 	private clearTypographySettings(): void {
 		const workspace = this.app.workspace.containerEl;
 		workspace.removeClasses(['dns-page-typography', 'dns-editor-typography']);
-		for (const property of [
-			'--dns-font-family',
-			'--dns-font-size',
-			'--dns-line-width',
-			'--dns-letter-spacing',
-			'--dns-word-spacing',
-			'--dns-line-height',
-			'--dns-paragraph-spacing',
-			'--dns-editing-font-family',
-			'--dns-editing-font-size',
-			'--dns-editing-line-width',
-			'--dns-editing-letter-spacing',
-			'--dns-editing-word-spacing',
-			'--dns-editing-line-height',
-			'--dns-editing-paragraph-spacing',
-		]) {
-			workspace.style.removeProperty(property);
-		}
+		applyVariables(workspace, {
+			...blankWhenOff(typographyVariables(this.settings, 'reading', '--dns-'), false),
+			...blankWhenOff(typographyVariables(this.settings, 'editing', '--dns-editing-'), false),
+		});
 	}
 
 	private hasCrossSectionContainer(preview: HTMLElement): boolean {
@@ -204,30 +191,16 @@ export default class DnsToolkitPlugin extends Plugin {
 		workspace.toggleClass('dns-page-typography', this.settings.enableTypography);
 		workspace.toggleClass('dns-editor-typography', this.settings.enableEditingTypography);
 
-		const values: Record<string, string | null> = {
-			'--dns-font-family': this.settings.enableTypography && this.settings.fontFamily
-				? this.settings.fontFamily
-				: null,
-			'--dns-font-size': this.settings.enableTypography ? `${this.settings.fontSize}px` : null,
-			'--dns-line-width': this.settings.enableTypography ? `${this.settings.lineWidth}px` : null,
-			'--dns-letter-spacing': this.settings.enableTypography ? `${this.settings.letterSpacing}em` : null,
-			'--dns-word-spacing': this.settings.enableTypography ? `${this.settings.wordSpacing}em` : null,
-			'--dns-line-height': this.settings.enableTypography ? String(this.settings.lineHeight) : null,
-			'--dns-paragraph-spacing': this.settings.enableTypography ? `${this.settings.paragraphSpacing}em` : null,
-			'--dns-editing-font-family': this.settings.enableEditingTypography && this.settings.editingFontFamily
-				? this.settings.editingFontFamily
-				: null,
-			'--dns-editing-font-size': this.settings.enableEditingTypography ? `${this.settings.editingFontSize}px` : null,
-			'--dns-editing-line-width': this.settings.enableEditingTypography ? `${this.settings.editingLineWidth}px` : null,
-			'--dns-editing-letter-spacing': this.settings.enableEditingTypography ? `${this.settings.editingLetterSpacing}em` : null,
-			'--dns-editing-word-spacing': this.settings.enableEditingTypography ? `${this.settings.editingWordSpacing}em` : null,
-			'--dns-editing-line-height': this.settings.enableEditingTypography ? String(this.settings.editingLineHeight) : null,
-			'--dns-editing-paragraph-spacing': this.settings.enableEditingTypography ? `${this.settings.editingParagraphSpacing}em` : null,
-		};
-		for (const [property, value] of Object.entries(values)) {
-			if (value === null) workspace.style.removeProperty(property);
-			else workspace.style.setProperty(property, value);
-		}
+		applyVariables(workspace, {
+			...blankWhenOff(
+				typographyVariables(this.settings, 'reading', '--dns-'),
+				this.settings.enableTypography,
+			),
+			...blankWhenOff(
+				typographyVariables(this.settings, 'editing', '--dns-editing-'),
+				this.settings.enableEditingTypography,
+			),
+		});
 	}
 
 	async loadSettings(): Promise<void> {
@@ -246,4 +219,13 @@ export default class DnsToolkitPlugin extends Plugin {
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
 	}
+}
+
+/** A view that is switched off contributes no variables of its own. */
+function blankWhenOff(
+	variables: Record<string, string | null>,
+	enabled: boolean,
+): Record<string, string | null> {
+	if (enabled) return variables;
+	return Object.fromEntries(Object.keys(variables).map((name) => [name, null]));
 }

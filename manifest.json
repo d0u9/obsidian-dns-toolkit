@@ -3,7 +3,7 @@
 	"name": "DnS Toolkit",
 	"version": "0.2.1",
 	"minAppVersion": "1.5.0",
-	"description": "Render extensible custom Markdown containers delimited by :::.",
+	"description": "Editorial ::: blocks, separate typography for reading and editing views, and desktop-only folder publishing with a side-by-side diff.",
 	"author": "DnS",
 	"isDesktopOnly": false
 }

@@ -11,6 +11,7 @@ import {
 } from 'obsidian';
 import { SUPPORTED_BLOCKS, blockExample } from './blocks';
 import type DnsToolkitPlugin from './main';
+import { applyVariables, typographyVariables } from './typography';
 
 export interface DnsToolkitSettings {
 	enableCustomContainers: boolean;
@@ -539,24 +540,10 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 	}
 
 	private applyTypographyPreview(): void {
-		const sample = this.typographyPreview;
-		if (!sample) return;
-		const editing = this.activeTypographyView === 'editing';
-		const settings = this.plugin.settings;
-		sample.style.setProperty('font-size', `${editing ? settings.editingFontSize : settings.fontSize}px`);
-		sample.style.setProperty('letter-spacing', `${editing ? settings.editingLetterSpacing : settings.letterSpacing}em`);
-		sample.style.setProperty('word-spacing', `${editing ? settings.editingWordSpacing : settings.wordSpacing}em`);
-		sample.style.setProperty('line-height', String(editing ? settings.editingLineHeight : settings.lineHeight));
-		const family = editing ? settings.editingFontFamily : settings.fontFamily;
-		if (family) sample.style.setProperty('font-family', family);
-		else sample.style.removeProperty('font-family');
-		sample.style.setProperty(
-			'max-width',
-			`${editing ? settings.editingLineWidth : settings.lineWidth}px`,
-		);
-		sample.style.setProperty(
-			'--dns-preview-paragraph-spacing',
-			`${editing ? settings.editingParagraphSpacing : settings.paragraphSpacing}em`,
+		if (!this.typographyPreview) return;
+		applyVariables(
+			this.typographyPreview,
+			typographyVariables(this.plugin.settings, this.activeTypographyView, '--dns-'),
 		);
 	}
 
