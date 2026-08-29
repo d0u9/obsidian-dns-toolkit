@@ -9,6 +9,7 @@ import {
 	type SliderComponent,
 	type TextComponent,
 } from 'obsidian';
+import { SUPPORTED_BLOCKS, blockExample } from './blocks';
 import type DnsToolkitPlugin from './main';
 
 export interface DnsToolkitSettings {
@@ -59,28 +60,6 @@ export const DEFAULT_SETTINGS: DnsToolkitSettings = {
 	publishingTargetFolder: '',
 };
 
-const SUPPORTED_BLOCKS: readonly {
-	type: string;
-	description: string;
-	example?: string;
-}[] = [
-	{ type: 'lead', description: 'Opening introduction' },
-	{ type: 'epigraph', description: 'Quotation or epigraph' },
-	{ type: 'poem', description: 'Verse with stanza spacing' },
-	{ type: 'aside', description: 'Supporting note or context' },
-	{ type: 'imgcap', description: 'Image caption' },
-	{ type: 'compnote', description: 'Closing composition note' },
-	{
-		type: 'center',
-		description: 'Centered text; adjust the height value as needed',
-		example: ':::center{height=120px}',
-	},
-	{
-		type: 'spacer',
-		description: 'Vertical blank space; adjust the height value as needed',
-		example: ':::spacer{height=5rem}',
-	},
-];
 
 // The value lands in a CSS custom property, so anything that could close the
 // declaration is dropped rather than trusted.
@@ -151,7 +130,7 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 						name: 'Supported blocks',
 						desc: 'Block types with dedicated editorial styles.',
 						items: SUPPORTED_BLOCKS.map((block) => ({
-							name: block.example ?? `:::${block.type}`,
+							name: blockExample(block),
 							desc: block.description,
 						})),
 					},
@@ -451,7 +430,7 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 		const blockList = this.containerEl.createDiv({ cls: 'dns-colon-block-list' });
 		for (const block of SUPPORTED_BLOCKS) {
 			const item = blockList.createDiv({ cls: 'dns-colon-block-list__item' });
-			item.createEl('code', { text: block.example ?? `:::${block.type}` });
+			item.createEl('code', { text: blockExample(block) });
 			item.createSpan({ text: block.description });
 		}
 	}

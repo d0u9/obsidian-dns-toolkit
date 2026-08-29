@@ -1,5 +1,6 @@
 import { MarkdownView, Notice, Plugin } from 'obsidian';
 import { registerCommands } from './commands';
+import { ColonBlockSuggest } from './editor/block-suggest';
 import {
 	containsCrossSectionDelimiter,
 	renderCustomContainers,
@@ -27,6 +28,7 @@ export default class DnsToolkitPlugin extends Plugin {
 		});
 
 		registerCommands(this);
+		this.registerEditorSuggest(new ColonBlockSuggest(this.app));
 		this.addSettingTab(new DnsToolkitSettingTab(this.app, this));
 		this.observeCrossSectionContainers();
 		this.renderMountedCrossSectionContainers();

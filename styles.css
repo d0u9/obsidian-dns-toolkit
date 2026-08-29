@@ -947,3 +947,12 @@
 @media (max-width: 620px) {
 	.dns-publishing-image { grid-template-columns: 1fr; }
 }
+
+.dns-block-suggestion__type {
+	font-family: var(--font-monospace);
+}
+
+.dns-block-suggestion__desc {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
