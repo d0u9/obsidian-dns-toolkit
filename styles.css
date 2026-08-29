@@ -163,7 +163,7 @@
 .dns-custom-container[data-type='imgcap'] .dns-custom-container__content :is(ol, ul),
 .markdown-rendered .dns-imgcap-segment.dns-imgcap-segment :is(ol, ul) {
 	--list-spacing: 0;
-	padding-inline-start: 1.1em;
+	padding-inline-start: var(--dns-imgcap-list-indent);
 }
 
 .dns-custom-container[data-type='imgcap'] .dns-custom-container__content li,
@@ -318,6 +318,8 @@
 	--dns-imgcap-line-height: 1.55;
 	/* Pulls the caption up towards the image it belongs to. */
 	--dns-imgcap-gap-top: -1.25rem;
+	/* Roughly one and a half characters: enough to hang a marker, no more. */
+	--dns-imgcap-list-indent: 1.5em;
 }
 
 .dns-custom-container[data-type='imgcap'] {
@@ -1037,6 +1039,7 @@
 .markdown-source-view.mod-cm6 .cm-line.dns-cm-block--imgcap.HyperMD-list-line {
 	--list-spacing: 0;
 	--line-height-normal: var(--dns-imgcap-line-height);
+	--list-indent: var(--dns-imgcap-list-indent);
 	padding-top: 0;
 	padding-bottom: 0;
 	color: var(--dns-imgcap-color);
@@ -1050,6 +1053,12 @@
 .markdown-source-view.mod-cm6 .cm-line.dns-cm-block--imgcap :is(span, div, .list-bullet, .list-number) {
 	font-size: inherit;
 	line-height: inherit;
+}
+
+/* Live Preview writes the list indent as an inline style, which nothing but
+   an important declaration can narrow. */
+.markdown-source-view.mod-cm6 .cm-line.dns-cm-block--imgcap.HyperMD-list-line {
+	padding-inline-start: var(--dns-imgcap-list-indent) !important;
 }
 
 /* The opening delimiter is the caption's first line, so it sits close to the
