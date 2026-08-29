@@ -42,12 +42,16 @@ export default class DnsToolkitPlugin extends Plugin {
 		const workspace = this.app.workspace.containerEl;
 		workspace.removeClasses(['dns-page-typography', 'dns-editor-typography']);
 		for (const property of [
+			'--dns-font-family',
 			'--dns-font-size',
+			'--dns-line-width',
 			'--dns-letter-spacing',
 			'--dns-word-spacing',
 			'--dns-line-height',
 			'--dns-paragraph-spacing',
+			'--dns-editing-font-family',
 			'--dns-editing-font-size',
+			'--dns-editing-line-width',
 			'--dns-editing-letter-spacing',
 			'--dns-editing-word-spacing',
 			'--dns-editing-line-height',
@@ -194,12 +198,20 @@ export default class DnsToolkitPlugin extends Plugin {
 		workspace.toggleClass('dns-editor-typography', this.settings.enableEditingTypography);
 
 		const values: Record<string, string | null> = {
+			'--dns-font-family': this.settings.enableTypography && this.settings.fontFamily
+				? this.settings.fontFamily
+				: null,
 			'--dns-font-size': this.settings.enableTypography ? `${this.settings.fontSize}px` : null,
+			'--dns-line-width': this.settings.enableTypography ? `${this.settings.lineWidth}px` : null,
 			'--dns-letter-spacing': this.settings.enableTypography ? `${this.settings.letterSpacing}em` : null,
 			'--dns-word-spacing': this.settings.enableTypography ? `${this.settings.wordSpacing}em` : null,
 			'--dns-line-height': this.settings.enableTypography ? String(this.settings.lineHeight) : null,
 			'--dns-paragraph-spacing': this.settings.enableTypography ? `${this.settings.paragraphSpacing}em` : null,
+			'--dns-editing-font-family': this.settings.enableEditingTypography && this.settings.editingFontFamily
+				? this.settings.editingFontFamily
+				: null,
 			'--dns-editing-font-size': this.settings.enableEditingTypography ? `${this.settings.editingFontSize}px` : null,
+			'--dns-editing-line-width': this.settings.enableEditingTypography ? `${this.settings.editingLineWidth}px` : null,
 			'--dns-editing-letter-spacing': this.settings.enableEditingTypography ? `${this.settings.editingLetterSpacing}em` : null,
 			'--dns-editing-word-spacing': this.settings.enableEditingTypography ? `${this.settings.editingWordSpacing}em` : null,
 			'--dns-editing-line-height': this.settings.enableEditingTypography ? String(this.settings.editingLineHeight) : null,

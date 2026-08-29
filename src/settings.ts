@@ -15,13 +15,17 @@ export interface DnsToolkitSettings {
 	enableCustomContainers: boolean;
 	defaultType: string;
 	enableTypography: boolean;
+	fontFamily: string;
 	fontSize: number;
+	lineWidth: number;
 	letterSpacing: number;
 	wordSpacing: number;
 	lineHeight: number;
 	paragraphSpacing: number;
 	enableEditingTypography: boolean;
+	editingFontFamily: string;
 	editingFontSize: number;
+	editingLineWidth: number;
 	editingLetterSpacing: number;
 	editingWordSpacing: number;
 	editingLineHeight: number;
@@ -35,13 +39,17 @@ export const DEFAULT_SETTINGS: DnsToolkitSettings = {
 	enableCustomContainers: true,
 	defaultType: 'note',
 	enableTypography: false,
+	fontFamily: '',
 	fontSize: 16,
+	lineWidth: 700,
 	letterSpacing: 0,
 	wordSpacing: 0,
 	lineHeight: 1.6,
 	paragraphSpacing: 1,
 	enableEditingTypography: false,
+	editingFontFamily: '',
 	editingFontSize: 16,
+	editingLineWidth: 700,
 	editingLetterSpacing: 0,
 	editingWordSpacing: 0,
 	editingLineHeight: 1.6,
@@ -73,6 +81,12 @@ const SUPPORTED_BLOCKS: readonly {
 		example: ':::spacer{height=5rem}',
 	},
 ];
+
+// The value lands in a CSS custom property, so anything that could close the
+// declaration is dropped rather than trusted.
+export function sanitizeFontFamily(value: string): string {
+	return value.replace(/[;{}]/g, '').trim();
+}
 
 // A path copied out of a terminal arrives shell-escaped ("Doug\\ Su"), which
 // resolves to a folder that does not exist and makes every file look new.
@@ -214,6 +228,11 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 				if (typeof value !== 'boolean') return;
 				this.plugin.settings[key] = value;
 				break;
+			case 'fontFamily':
+			case 'editingFontFamily':
+				if (typeof value !== 'string') return;
+				this.plugin.settings[key] = sanitizeFontFamily(value);
+				break;
 			case 'defaultType':
 				if (typeof value !== 'string' || !value.trim()) return;
 				this.plugin.settings.defaultType = value.trim();
@@ -227,6 +246,8 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 				this.plugin.settings.publishingTargetFolder = normalizePublishingTarget(value);
 				break;
 			case 'fontSize':
+			case 'lineWidth':
+			case 'editingLineWidth':
 			case 'letterSpacing':
 			case 'wordSpacing':
 			case 'lineHeight':
@@ -241,6 +262,11 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 				break;
 			default:
 				return;
+		}
+		if (key === 'fontFamily' || key === 'editingFontFamily') {
+			this.plugin.applyTypographySettings();
+			await this.plugin.saveSettings();
+			return;
 		}
 		if (key === 'enableCustomContainers') {
 			this.plugin.refreshCustomContainers();
@@ -272,6 +298,7 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 			},
 			...([
 				['Font size', `Base ${view} size in pixels.`, 'fontSize', 'editingFontSize', 12, 24, 0.5],
+				['Line width', 'Width of the text column in pixels, when readable line length is on.', 'lineWidth', 'editingLineWidth', 400, 1400, 10],
 				['Letter spacing', 'Space between characters in em.', 'letterSpacing', 'editingLetterSpacing', -0.05, 0.15, 0.005],
 				['Word spacing', 'Additional space between words in em.', 'wordSpacing', 'editingWordSpacing', -0.1, 0.5, 0.01],
 				['Line height', 'Vertical rhythm within paragraphs.', 'lineHeight', 'editingLineHeight', 1.2, 2.4, 0.05],
@@ -477,14 +504,17 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 					}),
 			);
 
+		this.addFontFamilySetting('fontFamily');
 		this.addTypographySlider('Font size', 'Base reading size in pixels.', 'fontSize', 12, 24, 0.5);
+		this.addTypographySlider('Line width', 'Width of the text column in pixels, when readable line length is on.', 'lineWidth', 400, 1400, 10);
 		this.addTypographySlider('Letter spacing', 'Space between characters in em.', 'letterSpacing', -0.05, 0.15, 0.005);
 		this.addTypographySlider('Word spacing', 'Additional space between words in em.', 'wordSpacing', -0.1, 0.5, 0.01);
 		this.addTypographySlider('Line height', 'Vertical rhythm within paragraphs.', 'lineHeight', 1.2, 2.4, 0.05);
 		this.addTypographySlider('Paragraph spacing', 'Space after ordinary paragraphs in em.', 'paragraphSpacing', 0.25, 2.5, 0.05);
-		this.renderTypographyResetAll([
-			'fontSize', 'letterSpacing', 'wordSpacing', 'lineHeight', 'paragraphSpacing',
-		]);
+		this.renderTypographyResetAll(
+			['fontSize', 'lineWidth', 'letterSpacing', 'wordSpacing', 'lineHeight', 'paragraphSpacing'],
+			'fontFamily',
+		);
 	}
 
 	// The settings modal covers the workspace, so the values are mirrored onto a
@@ -496,7 +526,10 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 			text: this.activeTypographyView === 'reading' ? 'Reading view preview' : 'Editing view preview',
 		});
 		const sample = preview.createDiv({ cls: 'dns-typography-preview__sample' });
-		for (const paragraph of PREVIEW_PARAGRAPHS) sample.createEl('p', { text: paragraph });
+		sample.createDiv({ cls: 'dns-typography-preview__heading', text: PREVIEW_HEADING });
+		sample.createEl('p', { text: PREVIEW_PARAGRAPHS[0] });
+		sample.createEl('blockquote', { text: PREVIEW_QUOTE });
+		sample.createEl('p', { text: PREVIEW_PARAGRAPHS[1] });
 		this.typographyPreview = sample;
 		this.applyTypographyPreview();
 	}
@@ -510,13 +543,41 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 		sample.style.setProperty('letter-spacing', `${editing ? settings.editingLetterSpacing : settings.letterSpacing}em`);
 		sample.style.setProperty('word-spacing', `${editing ? settings.editingWordSpacing : settings.wordSpacing}em`);
 		sample.style.setProperty('line-height', String(editing ? settings.editingLineHeight : settings.lineHeight));
+		const family = editing ? settings.editingFontFamily : settings.fontFamily;
+		if (family) sample.style.setProperty('font-family', family);
+		else sample.style.removeProperty('font-family');
+		sample.style.setProperty(
+			'max-width',
+			`${editing ? settings.editingLineWidth : settings.lineWidth}px`,
+		);
 		sample.style.setProperty(
 			'--dns-preview-paragraph-spacing',
 			`${editing ? settings.editingParagraphSpacing : settings.paragraphSpacing}em`,
 		);
 	}
 
-	private renderTypographyResetAll(keys: TypographyNumberKey[]): void {
+	private addFontFamilySetting(key: 'fontFamily' | 'editingFontFamily'): void {
+		new Setting(this.containerEl)
+			.setName('Font family')
+			.setDesc('A CSS font stack. Leave empty to follow the theme.')
+			.addText((text) => {
+				text.inputEl.addClass('dns-typography-font');
+				text
+					.setPlaceholder('"Source Han Serif SC", Georgia, serif')
+					.setValue(this.plugin.settings[key])
+					.onChange((value) => {
+						this.plugin.settings[key] = sanitizeFontFamily(value);
+						this.plugin.applyTypographySettings();
+						this.applyTypographyPreview();
+						this.saveSoon();
+					});
+			});
+	}
+
+	private renderTypographyResetAll(
+		keys: TypographyNumberKey[],
+		fontKey: 'fontFamily' | 'editingFontFamily',
+	): void {
 		new Setting(this.containerEl)
 			.setName('Reset this view')
 			.setDesc('Restore every value above to its default.')
@@ -525,6 +586,7 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 				.setTooltip('Reset this view')
 				.onClick(async () => {
 					for (const key of keys) this.plugin.settings[key] = DEFAULT_SETTINGS[key];
+					this.plugin.settings[fontKey] = DEFAULT_SETTINGS[fontKey];
 					this.plugin.applyTypographySettings();
 					await this.plugin.saveSettings();
 					this.renderActiveSection();
@@ -543,23 +605,24 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
+		this.addFontFamilySetting('editingFontFamily');
 		this.addTypographySlider('Font size', 'Base editor size in pixels.', 'editingFontSize', 12, 24, 0.5);
+		this.addTypographySlider('Line width', 'Width of the text column in pixels, when readable line length is on.', 'editingLineWidth', 400, 1400, 10);
 		this.addTypographySlider('Letter spacing', 'Space between characters in em.', 'editingLetterSpacing', -0.05, 0.15, 0.005);
 		this.addTypographySlider('Word spacing', 'Additional space between words in em.', 'editingWordSpacing', -0.1, 0.5, 0.01);
 		this.addTypographySlider('Line height', 'Vertical rhythm within editor lines.', 'editingLineHeight', 1.2, 2.4, 0.05);
 		this.addTypographySlider('Paragraph spacing', 'Space after editor paragraphs in em.', 'editingParagraphSpacing', 0, 2.5, 0.05);
-		this.renderTypographyResetAll([
-			'editingFontSize', 'editingLetterSpacing', 'editingWordSpacing',
-			'editingLineHeight', 'editingParagraphSpacing',
-		]);
+		this.renderTypographyResetAll(
+			['editingFontSize', 'editingLineWidth', 'editingLetterSpacing', 'editingWordSpacing',
+				'editingLineHeight', 'editingParagraphSpacing'],
+			'editingFontFamily',
+		);
 	}
 
 	private addTypographySlider(
 		name: string,
 		description: string,
-		key: 'fontSize' | 'letterSpacing' | 'wordSpacing' | 'lineHeight' | 'paragraphSpacing'
-			| 'editingFontSize' | 'editingLetterSpacing' | 'editingWordSpacing'
-			| 'editingLineHeight' | 'editingParagraphSpacing',
+		key: TypographyNumberKey,
 		minimum: number,
 		maximum: number,
 		step: number,
@@ -596,8 +659,19 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 			text.inputEl.step = String(step);
 			text.inputEl.addClass('dns-typography-number');
 			text.setValue(String(this.plugin.settings[key])).onChange((rawValue) => {
+				if (rawValue.trim() === '') return;
 				const value = Number(rawValue);
-				if (applyValue(value)) sliderComponent?.setValue(value);
+				if (!Number.isFinite(value)) return;
+				// Out-of-range input is pulled to the nearest end rather than
+				// silently ignored, which looked like a dead control.
+				const clamped = Math.min(maximum, Math.max(minimum, value));
+				applyValue(clamped);
+				sliderComponent?.setValue(clamped);
+			});
+			// Correcting the text mid-typing fights the user, so it is snapped
+			// back into range only once the field is left.
+			text.inputEl.addEventListener('blur', () => {
+				text.setValue(String(this.plugin.settings[key]));
 			});
 		});
 		setting.addSlider((slider) => {
@@ -631,6 +705,8 @@ export class DnsToolkitSettingTab extends PluginSettingTab {
 	}
 }
 
+const PREVIEW_HEADING = '示例标题 · Sample heading';
+const PREVIEW_QUOTE = '引用与标题跟随同一套字号与行高，便于一并判断。';
 const PREVIEW_PARAGRAPHS = [
 	'字体大小、字间距与行高会立刻反映在这段示例文字上，无需关闭设置面板。',
 	'Drag a slider and this sample updates as you go, so the reading rhythm can be judged before it is applied to a note.',
@@ -638,4 +714,5 @@ const PREVIEW_PARAGRAPHS = [
 
 type TypographyNumberKey = Exclude<keyof DnsToolkitSettings,
 	'enableCustomContainers' | 'defaultType' | 'enableTypography' | 'enableEditingTypography'
-	| 'enableFolderPublishing' | 'publishingSourceFolder' | 'publishingTargetFolder'>;
+	| 'enableFolderPublishing' | 'publishingSourceFolder' | 'publishingTargetFolder'
+	| 'fontFamily' | 'editingFontFamily'>;

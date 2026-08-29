@@ -59,6 +59,14 @@ Sample photograph from this site
 Containers are rendered in Reading view. Use the **Insert custom container**
 command to wrap selected text or insert a new container.
 
+## Page typography
+
+Reading and editing views can each override the font stack, font size, line
+width, letter and word spacing, line height, and paragraph spacing. A sample
+paragraph at the top of the section takes the values live, so a slider can be
+judged without closing the settings pane. Line width applies where the theme
+honours Obsidian's readable line length.
+
 ## Folder publishing
 
 The optional desktop-only folder publishing feature copies one direct

@@ -451,8 +451,14 @@
 }
 
 /* Reading-view typography controls. */
+/* Only takes effect where the theme honours readable line length. */
+.dns-page-typography .markdown-preview-view {
+	--file-line-width: var(--dns-line-width, var(--file-line-width));
+}
+
 .dns-page-typography .markdown-rendered {
 	--font-text-size: var(--dns-font-size);
+	font-family: var(--dns-font-family, var(--font-text));
 	font-size: var(--dns-font-size);
 	letter-spacing: var(--dns-letter-spacing);
 	word-spacing: var(--dns-word-spacing);
@@ -469,8 +475,13 @@
 	margin-block-end: var(--dns-paragraph-spacing);
 }
 
+.dns-editor-typography .markdown-source-view {
+	--file-line-width: var(--dns-editing-line-width, var(--file-line-width));
+}
+
 .dns-editor-typography .markdown-source-view.mod-cm6 .cm-content {
 	--font-text-size: var(--dns-editing-font-size);
+	font-family: var(--dns-editing-font-family, var(--font-text));
 	font-size: var(--dns-editing-font-size);
 	letter-spacing: var(--dns-editing-letter-spacing);
 	word-spacing: var(--dns-editing-word-spacing);
@@ -509,7 +520,7 @@
 
 .dns-typography-preview__sample {
 	--dns-preview-paragraph-spacing: 1em;
-	max-height: 11rem;
+	max-height: 13rem;
 	overflow-y: auto;
 	color: var(--text-normal);
 	font-family: var(--font-text);
@@ -521,6 +532,24 @@
 
 .dns-typography-preview__sample p:last-child {
 	margin-block-end: 0;
+}
+
+.dns-typography-preview__heading {
+	margin-block: 0 var(--dns-preview-paragraph-spacing);
+	font-size: 1.3em;
+	line-height: inherit;
+}
+
+.dns-typography-preview__sample blockquote {
+	margin-block: 0 var(--dns-preview-paragraph-spacing);
+	margin-inline: 0;
+	padding-inline-start: .8em;
+	border-inline-start: 2px solid var(--background-modifier-border);
+	color: var(--text-muted);
+}
+
+.dns-typography-font {
+	width: min(22rem, 45vw);
 }
 
 .dns-typography-number {
