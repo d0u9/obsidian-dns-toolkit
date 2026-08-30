@@ -1,6 +1,7 @@
+import type { EditorView } from '@codemirror/view';
 import { MarkdownView, Notice, Plugin } from 'obsidian';
 import { registerCommands } from './commands';
-import { colonBlockEditorExtension } from './editor/block-decorations';
+import { colonBlockEditorExtension, refreshColonBlocks } from './editor/block-decorations';
 import { ColonBlockSuggest } from './editor/block-suggest';
 import {
 	containsCrossSectionDelimiter,
@@ -169,6 +170,12 @@ export default class DnsToolkitPlugin extends Plugin {
 		// Editor decorations read the settings as they build, so ask CodeMirror
 		// to reconfigure alongside the rendered previews.
 		this.app.workspace.updateOptions();
+		// A state field outlives a reconfigure, so open editors are told outright.
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			if (!(leaf.view instanceof MarkdownView)) return;
+			const view = (leaf.view.editor as unknown as { cm?: EditorView }).cm;
+			view?.dispatch({ effects: refreshColonBlocks.of(null) });
+		});
 		for (const preview of Array.from(
 			this.app.workspace.containerEl.querySelectorAll<HTMLElement>(
 				'.markdown-preview-sizer',

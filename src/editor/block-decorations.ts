@@ -1,12 +1,12 @@
-import { RangeSetBuilder, type Extension, type Text } from '@codemirror/state';
 import {
-	Decoration,
-	ViewPlugin,
-	type DecorationSet,
-	type EditorView,
-	type PluginValue,
-	type ViewUpdate,
-} from '@codemirror/view';
+	RangeSetBuilder,
+	StateEffect,
+	StateField,
+	type EditorState,
+	type Extension,
+	type Text,
+} from '@codemirror/state';
+import { Decoration, EditorView, type DecorationSet } from '@codemirror/view';
 import { editorLivePreviewField } from 'obsidian';
 import type DnsToolkitPlugin from '../main';
 
@@ -26,41 +26,45 @@ export interface LineMark {
 	classes: string[];
 }
 
+/** Settings changed, so editors that are already open rebuild their marks. */
+export const refreshColonBlocks = StateEffect.define<null>();
+
 /**
  * Reading view owns the rendered blocks; this gives the editor the same shape
  * by classing the lines a block spans, without rewriting any text.
+ *
+ * These classes change line heights, so they have to come from a state field.
+ * CodeMirror computes heights and the viewport before it runs view plugins, so
+ * a plugin that resizes lines invalidates the viewport it was just handed: the
+ * measure loop restarts until CodeMirror gives up, and the scroll position goes
+ * with it.
  */
 export function colonBlockEditorExtension(plugin: DnsToolkitPlugin): Extension {
-	return ViewPlugin.fromClass(
-		class implements PluginValue {
-			decorations: DecorationSet;
-
-			constructor(view: EditorView) {
-				this.decorations = buildDecorations(view, plugin);
-			}
-
-			update(update: ViewUpdate): void {
-				// Block structure only depends on the text and on whether the
-				// view is showing raw Markdown.
-				const modeChanged = update.startState.field(editorLivePreviewField, false)
-					!== update.state.field(editorLivePreviewField, false);
-				if (!update.docChanged && !modeChanged) return;
-				this.decorations = buildDecorations(update.view, plugin);
-			}
+	return StateField.define<DecorationSet>({
+		create: (state) => buildDecorations(state, plugin),
+		update(value, transaction) {
+			// Block structure only depends on the text, on whether the view is
+			// showing raw Markdown, and on the settings behind it.
+			const modeChanged = transaction.startState.field(editorLivePreviewField, false)
+				!== transaction.state.field(editorLivePreviewField, false);
+			const refreshed = transaction.effects.some((effect) => effect.is(refreshColonBlocks));
+			// Line marks sit at line starts, which an unchanged document keeps.
+			if (!transaction.docChanged && !modeChanged && !refreshed) return value;
+			return buildDecorations(transaction.state, plugin);
 		},
-		{ decorations: (value) => value.decorations },
-	);
+		provide: (field) => EditorView.decorations.from(field),
+	});
 }
 
-function buildDecorations(view: EditorView, plugin: DnsToolkitPlugin): DecorationSet {
+function buildDecorations(state: EditorState, plugin: DnsToolkitPlugin): DecorationSet {
 	const builder = new RangeSetBuilder<Decoration>();
 	// Source mode asks for the raw text, so it gets it unshaped.
-	if (!view.state.field(editorLivePreviewField, false)) return builder.finish();
+	if (!state.field(editorLivePreviewField, false)) return builder.finish();
 	if (!plugin.settings.enableCustomContainers || !plugin.settings.enableEditorColonBlocks) {
 		return builder.finish();
 	}
 
-	const marks = markLines(view.state.doc, plugin.settings.defaultType);
+	const marks = markLines(state.doc, plugin.settings.defaultType);
 	for (const [line, mark] of marks) {
 		builder.add(
 			line,
