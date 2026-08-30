@@ -1003,11 +1003,17 @@
 }
 
 /* Editor shapes: the same reading rhythm, applied to lines rather than to a
-   rebuilt DOM, so the text stays editable. */
+   rebuilt DOM, so the text stays editable.
+
+   None of these rules may set font-size. CodeMirror samples one line to derive
+   the character width and line height it estimates every off-screen line with;
+   lines of differing size make that sample depend on what happens to be in
+   view, so the estimate oscillates, the measure loop restarts until CodeMirror
+   gives up, and the scroll position is lost with it. Line height, padding,
+   font family and letter spacing are all measured per line, and are safe. */
 .cm-line.dns-cm-delimiter {
 	color: var(--text-faint);
 	font-family: var(--font-monospace);
-	font-size: .85em;
 }
 
 .cm-line.dns-cm-unclosed {
@@ -1018,13 +1024,11 @@
 .cm-line.dns-cm-block--lead {
 	color: var(--text-muted);
 	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
-	font-size: .96em;
 	line-height: 1.75;
 }
 
 .cm-line.dns-cm-block--epigraph {
 	color: var(--text-muted);
-	font-size: .92em;
 	text-align: right;
 }
 
@@ -1038,12 +1042,10 @@
 	padding-inline-start: .9em;
 	border-inline-start: 2px solid var(--background-modifier-border);
 	color: var(--text-muted);
-	font-size: .94em;
 }
 
 .cm-line.dns-cm-block--compnote {
 	color: var(--text-muted);
-	font-size: .9em;
 }
 
 /* Captions read as an afterthought next to the image, in the editor too. The
@@ -1058,7 +1060,6 @@
 	padding-bottom: 0;
 	color: var(--dns-imgcap-color);
 	font-family: var(--dns-imgcap-font-family);
-	font-size: .78em;
 	font-weight: var(--dns-imgcap-font-weight);
 	line-height: var(--dns-imgcap-line-height);
 }
