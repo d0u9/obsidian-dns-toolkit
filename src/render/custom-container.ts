@@ -59,7 +59,7 @@ function clearAdjacencyClasses(root: HTMLElement): void {
 	);
 }
 
-function containsCjk(text: string): boolean {
+export function containsCjk(text: string): boolean {
 	return CJK_PATTERN.test(text);
 }
 

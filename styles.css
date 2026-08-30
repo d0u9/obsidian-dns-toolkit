@@ -88,20 +88,35 @@
 	transform: translateX(-50%);
 }
 
+/* One source of truth for verse, so the boxed poem, the segmented poem and the
+   editor's lines cannot drift apart. Han characters fill their box, so a line
+   of them needs more air than a line of Latin before the verse stops reading
+   as a block of text. The editor takes everything here but the size. */
+.dns-custom-container[data-type='poem'],
+.markdown-rendered .dns-poem-segment,
+.cm-line.dns-cm-block--poem {
+	--dns-poem-font-size: 1.02em;
+	--dns-poem-letter-spacing: .012em;
+	--dns-poem-line-height: 1.85;
+	--dns-poem-letter-spacing-cjk: .008em;
+	--dns-poem-line-height-cjk: 2.15;
+	--dns-poem-stanza-line-height: 2.6;
+}
+
 .dns-custom-container[data-type='poem'] {
 	margin: clamp(1.25rem, 3vh, 1.75rem) 0;
 	padding-left: clamp(1rem, 3vw, 2rem);
 	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
-	font-size: .96em;
+	font-size: var(--dns-poem-font-size);
 	font-weight: 400;
-	letter-spacing: .012em;
-	line-height: 1.6;
+	letter-spacing: var(--dns-poem-letter-spacing);
+	line-height: var(--dns-poem-line-height);
 	text-align: left;
 }
 
 .dns-custom-container[data-type='poem'].dns-custom-container--cjk {
-	letter-spacing: .008em;
-	line-height: 1.92;
+	letter-spacing: var(--dns-poem-letter-spacing-cjk);
+	line-height: var(--dns-poem-line-height-cjk);
 }
 
 /* Multi-stanza poems stay in Obsidian's own DOM and are styled in place. */
@@ -178,10 +193,10 @@
 	margin-block: 0;
 	padding-left: clamp(1rem, 3vw, 2rem);
 	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
-	font-size: .96em;
+	font-size: var(--dns-poem-font-size);
 	font-weight: 400;
-	letter-spacing: .012em;
-	line-height: 1.6;
+	letter-spacing: var(--dns-poem-letter-spacing);
+	line-height: var(--dns-poem-line-height);
 	text-align: left;
 }
 
@@ -198,8 +213,8 @@
 }
 
 .markdown-rendered .dns-poem-segment--cjk {
-	letter-spacing: .008em;
-	line-height: 1.92;
+	letter-spacing: var(--dns-poem-letter-spacing-cjk);
+	line-height: var(--dns-poem-line-height-cjk);
 }
 
 .dns-custom-container[data-type='aside'],
@@ -1087,7 +1102,18 @@
 	--dns-cm-block-gap: clamp(1rem, 2.5vh, 1.5rem);
 	padding-inline-start: clamp(1rem, 3vw, 2rem);
 	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
-	letter-spacing: .012em;
+	letter-spacing: var(--dns-poem-letter-spacing);
+	line-height: var(--dns-poem-line-height);
+}
+
+.cm-line.dns-cm-block--poem-cjk {
+	letter-spacing: var(--dns-poem-letter-spacing-cjk);
+	line-height: var(--dns-poem-line-height-cjk);
+}
+
+/* Set after both, so a stanza break is the same size in either language. */
+.cm-line.dns-cm-block--poem-break {
+	line-height: var(--dns-poem-stanza-line-height);
 }
 
 .cm-line.dns-cm-block--aside {

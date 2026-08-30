@@ -8,6 +8,7 @@ import {
 } from '@codemirror/state';
 import { Decoration, EditorView, type DecorationSet } from '@codemirror/view';
 import { editorLivePreviewField } from 'obsidian';
+import { containsCjk } from '../render/custom-container';
 import type DnsToolkitPlugin from '../main';
 
 const OPENING = /^(:{3,})\s*(?:([a-zA-Z][a-zA-Z0-9_-]*)(?:\{[^}]*\})?(?:\s+.+)?)?\s*$/;
@@ -19,6 +20,7 @@ interface OpenBlock {
 	type: string;
 	fence: number;
 	openedAt: number;
+	startLine: number;
 	firstContentLine: number;
 }
 
@@ -103,6 +105,7 @@ export function markLines(document: Text, defaultType: string): Map<number, Line
 			addClass(marks, line.from, 'dns-cm-delimiter');
 			addClass(marks, line.from, 'dns-cm-block--last');
 			open.pop();
+			markCjkVerse(marks, document, current, number);
 			continue;
 		}
 
@@ -115,6 +118,7 @@ export function markLines(document: Text, defaultType: string): Map<number, Line
 					type,
 					fence: (opening[1] ?? ':::').length,
 					openedAt: line.from,
+					startLine: number,
 					firstContentLine: line.to + 1,
 				});
 				addClass(marks, line.from, `dns-cm-block--${type}`);
@@ -126,11 +130,45 @@ export function markLines(document: Text, defaultType: string): Map<number, Line
 		}
 
 		markInside(marks, line.from, open);
+
+		// A blank line between stanzas. Latin leading is tighter than the CJK
+		// leading beside it, so the break is given a height of its own rather
+		// than left to whatever the verse's line height happens to be.
+		const inside = open[open.length - 1];
+		if (inside?.type === 'poem' && text.trim() === '') {
+			addClass(marks, line.from, 'dns-cm-block--poem-break');
+		}
 	}
 
-	// Whatever is still open never met a closing fence.
-	for (const block of open) addClass(marks, block.openedAt, 'dns-cm-unclosed');
+	// Whatever is still open never met a closing fence. A verse being typed is
+	// still verse, so it is spaced as one until the closer arrives.
+	for (const block of open) {
+		addClass(marks, block.openedAt, 'dns-cm-unclosed');
+		markCjkVerse(marks, document, block, document.lines);
+	}
 	return marks;
+}
+
+/**
+ * Han characters fill their box, so a Chinese poem needs looser leading than a
+ * Latin one. The rendered view decides this from the block's text; the editor
+ * reads the same lines to reach the same answer.
+ */
+function markCjkVerse(
+	marks: Map<number, LineMark>,
+	document: Text,
+	block: OpenBlock,
+	endLine: number,
+): void {
+	if (block.type !== 'poem') return;
+	let text = '';
+	for (let number = block.startLine; number <= endLine; number += 1) {
+		text += document.line(number).text;
+	}
+	if (!containsCjk(text)) return;
+	for (let number = block.startLine; number <= endLine; number += 1) {
+		addClass(marks, document.line(number).from, 'dns-cm-block--poem-cjk');
+	}
 }
 
 function markInside(marks: Map<number, LineMark>, from: number, open: OpenBlock[]): void {
