@@ -1070,11 +1070,10 @@
 	line-height: inherit;
 }
 
-/* The opening delimiter is the caption's first line, so it sits close to the
-   image the way the rendered caption does. */
-.markdown-source-view.mod-cm6 .cm-line.dns-cm-block--imgcap.dns-cm-block--first {
-	margin-top: var(--dns-imgcap-gap-top, -1.25rem);
-}
+/* The rendered caption is pulled up against its image with a negative margin,
+   but a .cm-line cannot do the same: CodeMirror measures line heights with
+   offsetHeight, which excludes margins, so the height map drifts from the DOM
+   and scrolling snaps back to the anchor. The editor keeps normal spacing. */
 
 .cm-line.dns-cm-block--center {
 	text-align: center;
