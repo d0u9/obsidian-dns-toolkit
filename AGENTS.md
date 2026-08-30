@@ -33,6 +33,26 @@ npm run dev
 npm run build
 ```
 
+### Building for two vaults
+
+`DNS_PLUGIN_OUTDIR`, set in the environment or in an untracked `.env`, sends the
+build into a vault's plugin folder instead of the repository root. Only one
+destination is written per run, so a vault that was not built into keeps
+whatever `main.js` it had last.
+
+The repository root is itself a plugin folder in the local vault, and its
+`styles.css` and `manifest.json` are the tracked sources, edited in place. A run
+that goes to another vault therefore leaves the local one holding fresh CSS and
+a stale `main.js` — a combination that behaves like neither version and has
+already cost an afternoon of chasing a bug that only existed in the mismatch.
+
+Build both before testing, and test only what was just built:
+
+```bash
+DNS_PLUGIN_OUTDIR=. npm run build   # the local vault, at the repository root
+npm run build                       # whatever .env points at
+```
+
 ## Linting
 
 - ESLint is preconfigured with `eslint-plugin-obsidianmd` for Obsidian-specific rules.
