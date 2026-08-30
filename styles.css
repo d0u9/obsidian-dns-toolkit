@@ -130,12 +130,15 @@
 	margin-block-start: var(--dns-poem-stanza-gap);
 }
 
-/* Multi-stanza poems stay in Obsidian's own DOM and are styled in place. */
-.dns-poem-delimiter,
-.dns-aside-delimiter,
-.dns-epigraph-delimiter,
-.dns-lead-delimiter,
-.dns-imgcap-delimiter { display: none; }
+/* Multi-stanza poems stay in Obsidian's own DOM and are styled in place. The
+   class is doubled so that `.dns-unclosed-delimiter`, which is a single class
+   and sits further down this file, cannot win on source order and show the
+   fence again. */
+.dns-poem-delimiter.dns-poem-delimiter,
+.dns-aside-delimiter.dns-aside-delimiter,
+.dns-epigraph-delimiter.dns-epigraph-delimiter,
+.dns-lead-delimiter.dns-lead-delimiter,
+.dns-imgcap-delimiter.dns-imgcap-delimiter { display: none; }
 
 /* One rule for every editorial block body, boxed or segmented: a list keeps
    the block's own type instead of falling back to the theme's list styling.

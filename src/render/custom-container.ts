@@ -338,6 +338,18 @@ function findDelimiterParagraph(
 	return candidates.find((candidate) => matches(candidate.textContent?.trim() ?? ''));
 }
 
+/**
+ * A block that runs past the end of a rendering section has no closing sibling,
+ * so `buildContainers` calls it unclosed before the cross-section pass gets to
+ * it. Claiming the delimiter takes that back: the block is closed, elsewhere.
+ */
+function claimDelimiter(element: HTMLElement, delimiterClass: string): void {
+	element.addClass(delimiterClass);
+	element.removeClass('dns-unclosed-delimiter');
+	element.removeAttribute('aria-label');
+	element.removeAttribute('title');
+}
+
 function markCrossSectionBlocks(root: HTMLElement): void {
 	splitCompactDelimiterParagraphs(root);
 	clearSegmentClasses(root);
@@ -372,14 +384,14 @@ function markCrossSectionBlocks(root: HTMLElement): void {
 				block.addClasses([SEGMENT_CLASS, segmentClass]);
 				if (type === 'poem' && isCjk) block.addClass('dns-poem-segment--cjk');
 			}
-			opener.addClass(delimiterClass);
-			closer.addClass(delimiterClass);
+			claimDelimiter(opener, delimiterClass);
+			claimDelimiter(closer, delimiterClass);
 
 			// A delimiter on its own line leaves an empty block behind; hide it so
 			// the outer spacing lands on the first and last blocks that show text.
 			const visible = blockSegments.filter((block) => {
 				if (delimiterRole(block) === null) return true;
-				block.addClass(delimiterClass);
+				claimDelimiter(block, delimiterClass);
 				return false;
 			});
 			const bounds = visible.length > 0 ? visible : blockSegments;
@@ -422,8 +434,8 @@ function markCrossSectionImgcaps(root: HTMLElement): void {
 		for (const segment of segments) {
 			segment.addClasses([SEGMENT_CLASS, 'dns-imgcap-segment']);
 		}
-		opener.addClass('dns-imgcap-delimiter');
-		closer.addClass('dns-imgcap-delimiter');
+		claimDelimiter(opener, 'dns-imgcap-delimiter');
+		claimDelimiter(closer, 'dns-imgcap-delimiter');
 
 		// A compact block makes the delimiter its own segment; those stay hidden,
 		// so the caption's outer spacing belongs to the first visible segment.
