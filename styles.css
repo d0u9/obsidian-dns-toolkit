@@ -1011,7 +1011,35 @@
    view, so the estimate oscillates, the measure loop restarts until CodeMirror
    gives up, and the scroll position is lost with it. Line height, padding,
    font family and letter spacing are all measured per line, and are safe. */
+/* Blocks need an outside edge here too. The first and last marks land on the
+   two delimiter lines, so the space goes above the opener and below the closer.
+   Padding rather than margin: CodeMirror measures lines with offsetHeight,
+   which leaves margins out of its height map. Each type sets its own amount;
+   the editor's are roughly half the rendered view's, which would otherwise
+   push the surrounding text off screen while writing. */
+.cm-line.dns-cm-block--first {
+	padding-top: var(--dns-cm-block-gap, 1.25rem);
+}
+
+.cm-line.dns-cm-block--last {
+	padding-bottom: var(--dns-cm-block-gap, 1.25rem);
+}
+
+/* The rendered view sets these blocks smaller than the body. A line here cannot
+   be sized without wrecking CodeMirror's height estimate, so they borrow a face
+   that reads smaller instead: Heiti sets a smaller face inside the em box than
+   PingFang and strokes it lighter. Hiragino backs it up on the machines Heiti
+   has been dropped from. The blocks set in a serif keep theirs. */
+.cm-line.dns-cm-block--epigraph,
+.cm-line.dns-cm-block--aside,
+.cm-line.dns-cm-block--compnote {
+	font-family: 'Avenir Next', 'Heiti SC', 'Hiragino Sans GB', sans-serif;
+}
+
+/* The fences are scaffolding, not text: present enough to find, quiet enough
+   to read past. */
 .cm-line.dns-cm-delimiter {
+	opacity: .65;
 	color: var(--text-faint);
 	font-family: var(--font-monospace);
 }
@@ -1022,29 +1050,61 @@
 }
 
 .cm-line.dns-cm-block--lead {
+	--dns-cm-block-gap: clamp(1.25rem, 3vh, 1.9rem);
 	color: var(--text-muted);
 	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
 	line-height: 1.75;
 }
 
 .cm-line.dns-cm-block--epigraph {
+	--dns-cm-block-gap: clamp(1.6rem, 4.4vh, 2.75rem);
+	/* The rendered epigraph is capped at 30rem and centred. A line cannot be
+	   centred with auto margins here, so the measure is narrowed from the left
+	   instead, which is the edge the ragged text is set away from. */
+	padding-inline-start: clamp(1rem, 12vw, 8rem);
 	color: var(--text-muted);
 	text-align: right;
 }
 
+/* The hairline the rendered epigraph opens with. Absolutely positioned, so it
+   sits in the gap above the block without adding a pixel to the line's height. */
+.cm-line.dns-cm-block--epigraph.dns-cm-block--first {
+	position: relative;
+}
+
+.cm-line.dns-cm-block--epigraph.dns-cm-block--first::before {
+	position: absolute;
+	top: calc(var(--dns-cm-block-gap) / 2);
+	left: 50%;
+	width: 2.5rem;
+	height: 1px;
+	background: var(--background-modifier-border);
+	content: '';
+	transform: translateX(-50%);
+}
+
 .cm-line.dns-cm-block--poem {
+	--dns-cm-block-gap: clamp(1rem, 2.5vh, 1.5rem);
 	padding-inline-start: clamp(1rem, 3vw, 2rem);
 	font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', 'Songti SC', STSong, serif;
 	letter-spacing: .012em;
 }
 
 .cm-line.dns-cm-block--aside {
+	--dns-cm-block-gap: clamp(1.9rem, 4.75vh, 3rem);
 	padding-inline-start: .9em;
+	/* Stands in for the rendered aside's 40rem cap. */
+	padding-inline-end: clamp(0rem, 8vw, 5rem);
 	border-inline-start: 2px solid var(--background-modifier-border);
 	color: var(--text-muted);
 }
 
+/* A dashed rule, against the aside's solid one: both are set to the side of
+   the argument, and the editor has nothing else left to tell them apart. */
 .cm-line.dns-cm-block--compnote {
+	--dns-cm-block-gap: 1.25rem;
+	padding-inline-start: .9em;
+	border-inline-start: 1px dashed var(--background-modifier-border);
 	color: var(--text-muted);
 }
 
@@ -1053,6 +1113,12 @@
    are as well or a caption's list would keep the body's size and spacing. */
 .markdown-source-view.mod-cm6 .cm-line.dns-cm-block--imgcap,
 .markdown-source-view.mod-cm6 .cm-line.dns-cm-block--imgcap.HyperMD-list-line {
+	/* A caption cannot be set smaller than the body here, so it is set tighter
+	   instead: the rendered view's 1.55 is looser than the body's 1.5 and reads
+	   as no difference at all. Line height is measured per line, so unlike font
+	   size it costs the height estimate nothing. */
+	--dns-imgcap-line-height: 1.25;
+	--dns-imgcap-font-family: 'Avenir Next', 'Heiti SC', 'Hiragino Sans GB', sans-serif;
 	--list-spacing: 0;
 	--line-height-normal: var(--dns-imgcap-line-height);
 	--list-indent: var(--dns-imgcap-list-indent);
