@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-dns-toolkit",
-	"version": "0.2.2",
+	"version": "0.3.0",
 	"description": "A modular toolkit for extending and refining Obsidian workflows.",
 	"main": "main.js",
 	"type": "module",
